@@ -1,0 +1,175 @@
+# 结婚系统 GUI：默认值如下；layout 为1–6行，每行9字符，A为空槽。
+# 修改后 reload 并重新打开生效，不影响已有数据；action 仅限内置动作。
+{
+  "title": "<gradient:#F5ADCD:#B5A4F0>结婚系统 · 情侣殿堂</gradient>",
+  "layout": [
+    "#########",
+    "#IATARAB#",
+    "#ACAAAWA#",
+    "#AAGAUAA#",
+    "#AAAAAAA#",
+    "P###F###N"
+  ],
+  "icons": {
+    "#": {
+      "name": "§e✧ 闪闪发光的边框 ✧",
+      "material": "WHITE_STAINED_GLASS_PANE",
+      "lore": [
+        "§7嘿嘿嘿～",
+        "§7戳我干嘛呀小坏蛋～"
+      ],
+      "isEnchant": false,
+      "custom-model-data": 0,
+      "hideFlag": true,
+      "hideEnchant": true
+    },
+    "I": {
+      "name": "<gradient:#F5ADCD:#B5A4F0>婚姻信息</gradient>",
+      "material": "BOOK",
+      "lore": [
+        "<gray>查看双方资料和羁绊。</gray>",
+        "<yellow>左键点击使用</yellow>"
+      ],
+      "action": "info",
+      "isEnchant": false,
+      "custom-model-data": 0,
+      "hideFlag": true,
+      "hideEnchant": true
+    },
+    "C": {
+      "name": "<gradient:#F5ADCD:#B5A4F0>普通结婚</gradient>",
+      "material": "PINK_DYE",
+      "lore": [
+        "<gray>双方同意后直接登记。</gray>",
+        "<yellow>左键点击使用</yellow>",
+        "<red>此操作会改变关系、传送或扣除物品，请确认后使用。</red>"
+      ],
+      "action": "normal-marriage",
+      "isEnchant": false,
+      "custom-model-data": 0,
+      "hideFlag": true,
+      "hideEnchant": true
+    },
+    "W": {
+      "name": "<gradient:#F5ADCD:#B5A4F0>婚礼结婚</gradient>",
+      "material": "ROSE_BUSH",
+      "lore": [
+        "<gray>先订婚，再筹备婚礼。</gray>",
+        "<yellow>左键点击使用</yellow>",
+        "<red>此操作会改变关系、传送或扣除物品，请确认后使用。</red>"
+      ],
+      "action": "wedding-marriage",
+      "isEnchant": false,
+      "custom-model-data": 0,
+      "hideFlag": true,
+      "hideEnchant": true
+    },
+    "B": {
+      "name": "<gradient:#F5ADCD:#B5A4F0>婚礼筹备</gradient>",
+      "material": "BELL",
+      "lore": [
+        "<gray>管理场地、请帖和贺礼。</gray>",
+        "<yellow>左键点击使用</yellow>"
+      ],
+      "action": "wedding-plan",
+      "isEnchant": false,
+      "custom-model-data": 0,
+      "hideFlag": true,
+      "hideEnchant": true
+    },
+    "T": {
+      "name": "<gradient:#F5ADCD:#B5A4F0>情侣任务</gradient>",
+      "material": "PAPER",
+      "lore": [
+        "<gray>查看每日任务进度。</gray>",
+        "<yellow>左键点击使用</yellow>"
+      ],
+      "action": "task",
+      "isEnchant": false,
+      "custom-model-data": 0,
+      "hideFlag": true,
+      "hideEnchant": true
+    },
+    "R": {
+      "name": "<gradient:#F5ADCD:#B5A4F0>排行榜</gradient>",
+      "material": "GOLD_INGOT",
+      "lore": [
+        "<gray>切换四种情侣榜单。</gray>",
+        "<yellow>左键点击使用</yellow>"
+      ],
+      "action": "rank",
+      "isEnchant": false,
+      "custom-model-data": 0,
+      "hideFlag": true,
+      "hideEnchant": true
+    },
+    "G": {
+      "name": "<gradient:#F5ADCD:#B5A4F0>领取箱</gradient>",
+      "material": "CHEST",
+      "lore": [
+        "<gray>领取奖励与礼物。</gray>",
+        "<yellow>左键点击使用</yellow>",
+        "<red>此操作会改变关系、传送或扣除物品，请确认后使用。</red>"
+      ],
+      "action": "gifts",
+      "isEnchant": false,
+      "custom-model-data": 0,
+      "hideFlag": true,
+      "hideEnchant": true
+    },
+    "U": {
+      "name": "<gradient:#F5ADCD:#B5A4F0>伴侣传送</gradient>",
+      "material": "ENDER_PEARL",
+      "lore": [
+        "<gray>传送至伴侣身边。</gray>",
+        "<yellow>左键点击使用</yellow>",
+        "<red>此操作会改变关系、传送或扣除物品，请确认后使用。</red>"
+      ],
+      "action": "tp",
+      "isEnchant": false,
+      "custom-model-data": 0,
+      "hideFlag": true,
+      "hideEnchant": true
+    },
+    "P": {
+      "name": "<gradient:#F5ADCD:#B5A4F0>上一页</gradient>",
+      "material": "ARROW",
+      "lore": [
+        "<gray>查看上一页内容。</gray>",
+        "<yellow>左键点击使用</yellow>"
+      ],
+      "action": "previous-page",
+      "isEnchant": false,
+      "custom-model-data": 0,
+      "hideFlag": true,
+      "hideEnchant": true
+    },
+    "N": {
+      "name": "<gradient:#F5ADCD:#B5A4F0>下一页</gradient>",
+      "material": "ARROW",
+      "lore": [
+        "<gray>查看下一页内容。</gray>",
+        "<yellow>左键点击使用</yellow>"
+      ],
+      "action": "next-page",
+      "isEnchant": false,
+      "custom-model-data": 0,
+      "hideFlag": true,
+      "hideEnchant": true
+    },
+    "F": {
+      "name": "<gradient:#F5ADCD:#B5A4F0>返回</gradient>",
+      "material": "OAK_DOOR",
+      "lore": [
+        "<gray>返回上级菜单；主菜单默认执行 /mc。</gray>",
+        "<yellow>左键点击使用</yellow>"
+      ],
+      "action": "back",
+      "isEnchant": false,
+      "custom-model-data": 0,
+      "hideFlag": true,
+      "hideEnchant": true,
+      "return-command": "/mc"
+    }
+  }
+}

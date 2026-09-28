@@ -1,0 +1,6 @@
+types:
+  bond-level: 羁绊等级榜
+  duration: 结婚时长榜
+  online: 共同在线榜
+  bond-total: 羁绊值总量榜
+top-size: 10

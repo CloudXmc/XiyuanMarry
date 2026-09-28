@@ -1,0 +1,80 @@
+# 结婚系统 GUI：默认值如下；layout 为1–6行，每行9字符，A为空槽。
+# 修改后 reload 并重新打开生效，不影响已有数据；action 仅限内置动作。
+{
+  "title": "<gradient:#F5ADCD:#B5A4F0>请帖管理</gradient>",
+  "layout": [
+    "#########",
+    "#DDDDDDD#",
+    "#DDDDDDD#",
+    "#DDDDDDD#",
+    "#AAAAAAA#",
+    "P###F###N"
+  ],
+  "icons": {
+    "#": {
+      "name": "§e✧ 闪闪发光的边框 ✧",
+      "material": "WHITE_STAINED_GLASS_PANE",
+      "lore": [
+        "§7嘿嘿嘿～",
+        "§7戳我干嘛呀小坏蛋～"
+      ],
+      "isEnchant": false,
+      "custom-model-data": 0,
+      "hideFlag": true,
+      "hideEnchant": true
+    },
+    "D": {
+      "name": "<gradient:#F5ADCD:#B5A4F0>{entry.name}</gradient>",
+      "material": "PAPER",
+      "lore": [
+        "<gray>{entry.description}</gray>",
+        "<yellow>左键点击使用</yellow>"
+      ],
+      "action": "select",
+      "isEnchant": false,
+      "custom-model-data": 0,
+      "hideFlag": true,
+      "hideEnchant": true
+    },
+    "P": {
+      "name": "<gradient:#F5ADCD:#B5A4F0>上一页</gradient>",
+      "material": "ARROW",
+      "lore": [
+        "<gray>查看上一页内容。</gray>",
+        "<yellow>左键点击使用</yellow>"
+      ],
+      "action": "previous-page",
+      "isEnchant": false,
+      "custom-model-data": 0,
+      "hideFlag": true,
+      "hideEnchant": true
+    },
+    "N": {
+      "name": "<gradient:#F5ADCD:#B5A4F0>下一页</gradient>",
+      "material": "ARROW",
+      "lore": [
+        "<gray>查看下一页内容。</gray>",
+        "<yellow>左键点击使用</yellow>"
+      ],
+      "action": "next-page",
+      "isEnchant": false,
+      "custom-model-data": 0,
+      "hideFlag": true,
+      "hideEnchant": true
+    },
+    "F": {
+      "name": "<gradient:#F5ADCD:#B5A4F0>返回</gradient>",
+      "material": "OAK_DOOR",
+      "lore": [
+        "<gray>返回上级菜单；主菜单默认执行 /mc。</gray>",
+        "<yellow>左键点击使用</yellow>"
+      ],
+      "action": "back",
+      "isEnchant": false,
+      "custom-model-data": 0,
+      "hideFlag": true,
+      "hideEnchant": true,
+      "return-command": "/mc"
+    }
+  }
+}

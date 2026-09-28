@@ -1,0 +1,135 @@
+# 结婚系统 GUI：默认值如下；layout 为1–6行，每行9字符，A为空槽。
+# 修改后 reload 并重新打开生效，不影响已有数据；action 仅限内置动作。
+{
+  "title": "<gradient:#F5ADCD:#B5A4F0>婚礼筹备</gradient>",
+  "layout": [
+    "#########",
+    "#LAIAGAA#",
+    "#AAASACA#",
+    "#AAAAAAA#",
+    "#AAAAAAA#",
+    "P###F###N"
+  ],
+  "icons": {
+    "#": {
+      "name": "§e✧ 闪闪发光的边框 ✧",
+      "material": "WHITE_STAINED_GLASS_PANE",
+      "lore": [
+        "§7嘿嘿嘿～",
+        "§7戳我干嘛呀小坏蛋～"
+      ],
+      "isEnchant": false,
+      "custom-model-data": 0,
+      "hideFlag": true,
+      "hideEnchant": true
+    },
+    "L": {
+      "name": "<gradient:#F5ADCD:#B5A4F0>设置场地</gradient>",
+      "material": "LODESTONE",
+      "lore": [
+        "<gray>将当前位置设置为婚礼场地。</gray>",
+        "<yellow>左键点击使用</yellow>"
+      ],
+      "action": "set-wedding-location",
+      "isEnchant": false,
+      "custom-model-data": 0,
+      "hideFlag": true,
+      "hideEnchant": true
+    },
+    "I": {
+      "name": "<gradient:#F5ADCD:#B5A4F0>发送请帖</gradient>",
+      "material": "PAPER",
+      "lore": [
+        "<gray>邀请在线玩家参加婚礼。</gray>",
+        "<yellow>左键点击使用</yellow>"
+      ],
+      "action": "invitations",
+      "isEnchant": false,
+      "custom-model-data": 0,
+      "hideFlag": true,
+      "hideEnchant": true
+    },
+    "G": {
+      "name": "<gradient:#F5ADCD:#B5A4F0>贺礼记录</gradient>",
+      "material": "CHEST",
+      "lore": [
+        "<gray>查看和领取贺礼。</gray>",
+        "<yellow>左键点击使用</yellow>",
+        "<red>此操作会改变关系、传送或扣除物品，请确认后使用。</red>"
+      ],
+      "action": "gifts",
+      "isEnchant": false,
+      "custom-model-data": 0,
+      "hideFlag": true,
+      "hideEnchant": true
+    },
+    "S": {
+      "name": "<gradient:#F5ADCD:#B5A4F0>开始婚礼</gradient>",
+      "material": "BELL",
+      "lore": [
+        "<gray>先设置 nx、nl、ly 及宾客座位。</gray>",
+        "<yellow>左键点击使用</yellow>",
+        "<red>此操作会改变关系、传送或扣除物品，请确认后使用。</red>"
+      ],
+      "action": "start-wedding",
+      "isEnchant": false,
+      "custom-model-data": 0,
+      "hideFlag": true,
+      "hideEnchant": true
+    },
+    "C": {
+      "name": "<gradient:#F5ADCD:#B5A4F0>取消订婚</gradient>",
+      "material": "BARRIER",
+      "lore": [
+        "<gray>取消当前订婚关系。</gray>",
+        "<yellow>左键点击使用</yellow>",
+        "<red>此操作会改变关系、传送或扣除物品，请确认后使用。</red>"
+      ],
+      "action": "cancel",
+      "isEnchant": false,
+      "custom-model-data": 0,
+      "hideFlag": true,
+      "hideEnchant": true
+    },
+    "P": {
+      "name": "<gradient:#F5ADCD:#B5A4F0>上一页</gradient>",
+      "material": "ARROW",
+      "lore": [
+        "<gray>查看上一页内容。</gray>",
+        "<yellow>左键点击使用</yellow>"
+      ],
+      "action": "previous-page",
+      "isEnchant": false,
+      "custom-model-data": 0,
+      "hideFlag": true,
+      "hideEnchant": true
+    },
+    "N": {
+      "name": "<gradient:#F5ADCD:#B5A4F0>下一页</gradient>",
+      "material": "ARROW",
+      "lore": [
+        "<gray>查看下一页内容。</gray>",
+        "<yellow>左键点击使用</yellow>"
+      ],
+      "action": "next-page",
+      "isEnchant": false,
+      "custom-model-data": 0,
+      "hideFlag": true,
+      "hideEnchant": true
+    },
+    "F": {
+      "name": "<gradient:#F5ADCD:#B5A4F0>返回</gradient>",
+      "material": "OAK_DOOR",
+      "lore": [
+        "<gray>返回上级菜单；主菜单默认执行 /mc。</gray>",
+        "<yellow>左键点击使用</yellow>"
+      ],
+      "action": "back",
+      "isEnchant": false,
+      "custom-model-data": 0,
+      "hideFlag": true,
+      "hideEnchant": true,
+      "return-command": "/mc"
+    }
+  }
+}

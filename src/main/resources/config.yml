@@ -1,0 +1,106 @@
+# 结婚系统：默认值如下；全部支持 /marryadmin reload，校验失败保留旧配置。
+# 身份可选 OFFLINE_NAME/ONLINE_UUID；数据库可选 SQLITE/MYSQL。切换不迁移旧数据。
+# 小时范围 1-8760，再婚冷却允许0；在线分钟0-1000000，每日次数1-1000，超时秒1-86400。
+# 池大小1-32（SQLite固定1），连接超时1000-60000毫秒；修改数据库参数会更换连接池。
+# 消息使用 MiniMessage，{占位符}按纯文本替换；语言文件仅影响展示。
+{
+  "identity": {
+    "mode": "OFFLINE_NAME",
+    "offline-name-ignore-case": true,
+    "save-last-known-name": true
+  },
+  "database": {
+    "type": "SQLITE",
+    "sqlite-file": "data/marriages.db",
+    "pool-size": 4,
+    "timeout-ms": 5000,
+    "mysql": {
+      "host": "127.0.0.1",
+      "port": 3306,
+      "database": "xiyuan_marry",
+      "username": "marry",
+      "password": "change-me",
+      "parameters": "useSSL=true&characterEncoding=UTF-8&connectTimeout=5000&socketTimeout=10000"
+    }
+  },
+  "marriage": {
+    "proposal-expire-seconds": 300,
+    "engagement-hours": 48,
+    "divorce-cooling-hours": 24,
+    "remarriage-cooling-hours": 24,
+    "proposal-daily-limit": 3,
+    "minimum-online-minutes": 30
+  },
+  "wedding": {
+    "enabled": true,
+    "oath-text": "我愿意",
+    "ceremony-timeout-seconds": 300,
+    "invite-expire-hours": 24
+  },
+  "bond": {
+    "common-online-enabled": true,
+    "common-online-per-hour": 10,
+    "first-together-login": 8,
+    "elite-kill": 5,
+    "build-ten-blocks": 1,
+    "task-complete": 20,
+    "wedding-gift-target": 15,
+    "levels": {
+      "1": {
+        "name": "倾心",
+        "required": 0
+      },
+      "2": {
+        "name": "相知",
+        "required": 100
+      },
+      "3": {
+        "name": "相守",
+        "required": 250
+      },
+      "4": {
+        "name": "同心",
+        "required": 500
+      },
+      "5": {
+        "name": "挚爱",
+        "required": 1000
+      },
+      "6": {
+        "name": "情深",
+        "required": 2000
+      },
+      "7": {
+        "name": "不渝",
+        "required": 3500
+      },
+      "8": {
+        "name": "永恒",
+        "required": 5500
+      },
+      "9": {
+        "name": "共生",
+        "required": 8000
+      },
+      "10": {
+        "name": "至尊",
+        "required": 12000
+      }
+    }
+  },
+  "privileges": {
+    "partner-teleport-cooldown-seconds": 600,
+    "buff-distance": 20,
+    "ring-offhand-required": true,
+    "ring-buff-duration-ticks": 120,
+    "ring-materials": {
+      "engagement": "GOLD_NUGGET",
+      "marriage": "DIAMOND"
+    },
+    "ring-effects": {
+      "speed-amplifier": 0,
+      "resistance-amplifier": 0
+    }
+  },
+  "timezone": "Asia/Shanghai"
+}

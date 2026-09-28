@@ -1,0 +1,37 @@
+name: XiyuanMarry
+version: 2.8.3
+main: cn.mcxyd.xiyuanmarry.XiyuanMarryPlugin
+api-version: '1.21.11'
+author: xiaota
+description: 结婚系统与情侣养成插件
+folia-supported: true
+softdepend: [PlaceholderAPI, Vault, DecentHolograms]
+libraries:
+  - org.xerial:sqlite-jdbc:3.46.1.0
+  - com.zaxxer:HikariCP:6.3.0
+  - com.google.code.gson:gson:2.11.0
+  - com.mysql:mysql-connector-j:9.2.0
+commands:
+  marry:
+    description: 结婚系统主指令
+    usage: /marry help
+    aliases: [xmarry]
+  marryadmin:
+    description: 结婚系统管理员指令
+    usage: /marryadmin help
+permissions:
+  marry.use: {description: 使用结婚系统, default: true}
+  marry.admin: {description: 使用结婚系统管理员指令, default: op}
+  marry.admin.reload: {description: 重载结婚系统配置, default: op}
+  marry.admin.force: {description: 强制结婚, default: op}
+  marry.admin.divorce: {description: 强制离婚, default: op}
+  marry.admin.set: {description: 设置羁绊等级和数值, default: op}
+
+  marry.admin.setexp: {description: 设置羁绊值, default: op}
+  marry.admin.give: {description: 发放戒指, default: op}
+  marry.admin.list: {description: 查看情侣列表, default: op}
+  marry.admin.clear: {description: 清空玩家婚姻数据, default: op}
+
+
+
+

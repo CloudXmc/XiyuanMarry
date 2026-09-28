@@ -1,0 +1,23 @@
+default-trigger-distance: 50
+cycle-days: 30
+# 可选：填写30个任务 id 固定每日顺序；留空则按配置顺序循环。
+# 任务进度按情侣关系和绝对日序保存，跨第三十天不会重复领取同一日奖励。
+tasks:
+  - {id: kill-monster, type: COMMON_KILL_MONSTER, name: 共同击杀怪物, target: 10}
+  - {id: kill-animal, type: COMMON_KILL_ANIMAL, name: 共同击杀动物, target: 10}
+  - {id: kill-specific, type: COMMON_KILL_SPECIFIC, name: 共同击杀指定怪物, target: 3}
+  - {id: place-block, type: COMMON_PLACE_BLOCK, name: 共同放置方块, target: 20}
+  - {id: break-block, type: COMMON_BREAK_BLOCK, name: 共同破坏方块, target: 20}
+  - {id: eat-food, type: COMMON_EAT_FOOD, name: 共同食用食物, target: 5}
+  - {id: enchant, type: COMMON_ENCHANT, name: 共同附魔物品, target: 2}
+  - {id: smelt, type: COMMON_SMELT, name: 共同冶炼物品, target: 16}
+  - {id: craft, type: COMMON_CRAFT, name: 共同合成物品, target: 10}
+  - {id: anvil, type: COMMON_ANVIL, name: 共同铁砧锻造, target: 2}
+  - {id: fish, type: COMMON_FISH, name: 共同钓鱼, target: 5}
+  - {id: brew, type: COMMON_BREW, name: 共同酿造药水, target: 3}
+  - {id: trade, type: COMMON_TRADE, name: 共同村民交易, target: 10}
+  - {id: tame, type: COMMON_TAME, name: 共同驯服动物, target: 1}
+  - {id: sleep, type: COMMON_SLEEP, name: 共同睡觉, target: 1}
+  - {id: elytra, type: COMMON_ELYTRA, name: 共同鞘翅飞行, target: 1000}
+  - {id: biome, type: COMMON_BIOME, name: 共同探索群系, target: 1}
+  - {id: experience, type: COMMON_EXPERIENCE, name: 共同获得经验, target: 100}
