@@ -20,8 +20,8 @@ public final class MarriageSubcommands {
   root.add(new PlayerCommand("invite","marry.use",m,d,msg){public void execute(CommandSender s,String l,String[] a){if(a.length<1){msg.send(s,"invalid-argument");return;}var t=d.name(a[0]);if(t==null){msg.send(s,"offline");return;}w.invite(p(s),t);}});
   root.add(new PlayerCommand("startw","marry.use",m,d,msg){public void execute(CommandSender s,String l,String[] a){w.start(p(s));}});
   root.add(new PlayerCommand("oath","marry.use",m,d,msg){public void execute(CommandSender s,String l,String[] a){w.oath(p(s));}});
-  root.add(new PlayerCommand("acceptinvitation","marry.use",m,d,msg){public void execute(CommandSender s,String l,String[] a){w.respond(p(s),true);}});
-  root.add(new PlayerCommand("denyinvitation","marry.use",m,d,msg){public void execute(CommandSender s,String l,String[] a){w.respond(p(s),false);}});
+  root.add(new InvitationResponseSubcommand(true,w,d,msg));
+  root.add(new InvitationResponseSubcommand(false,w,d,msg));
   root.add(new PlayerCommand("chat","marry.use",m,d,msg){public void execute(CommandSender s,String l,String[] a){if(a.length==0){msg.send(s,"invalid-argument");return;}m.partnerChat(p(s),String.join(" ",a));}});
   root.add(new PlayerCommand("gift","marry.use",m,d,msg){public void execute(CommandSender s,String l,String[] a){if(a.length!=0){msg.send(s,"invalid-argument");return;}gifts.send(p(s));}});
   root.add(new PlayerCommand("weddinggift","marry.use",m,d,msg){public void execute(CommandSender s,String l,String[] a){if(a.length!=1){msg.send(s,"invalid-argument");return;}UUID id=m.identityByName(a[0]);if(id==null){msg.send(s,"offline");return;}gifts.weddingGift(p(s),id);}public List<String> complete(CommandSender s,String[] a){return a.length==1?d.all().stream().map(PlayerSnapshot::name).filter(n->n.startsWith(a[0])).toList():List.of();}});

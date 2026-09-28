@@ -1,8 +1,4 @@
-# 结婚系统：默认值如下；全部支持 /marryadmin reload，校验失败保留旧配置。
-# 身份可选 OFFLINE_NAME/ONLINE_UUID；数据库可选 SQLITE/MYSQL。切换不迁移旧数据。
-# 小时范围 1-8760，再婚冷却允许0；在线分钟0-1000000，每日次数1-1000，超时秒1-86400。
-# 池大小1-32（SQLite固定1），连接超时1000-60000毫秒；修改数据库参数会更换连接池。
-# 消息使用 MiniMessage，{占位符}按纯文本替换；语言文件仅影响展示。
+# 中文消息模板；所有 menu-* 为菜单读取、搜索、请帖选择和领取状态的默认文案。文本可自定义，保留对应占位符；reload 生效，不改变历史数据。
 {
   "prefix": "<dark_gray>[<gradient:#FF92B4:#B79CFF>结婚系统</gradient>]</dark_gray> ",
   "loading": "<yellow>数据正在加载，请稍后重试。</yellow>",
@@ -27,7 +23,7 @@
   "proposal-sent": "<gradient:#F6B68D:#EF97BA>已向 {player} 发送{mode}求婚。</gradient>",
   "proposal-received": "<gradient:#EE9ECF:#B29CEE>{player}</gradient><gray>向你发起{mode}求婚；使用 /marry accept proposal 或 /marry deny proposal。</gray>",
   "request-missing": "<yellow>没有有效请求。</yellow>",
-  "request-ambiguous": "<yellow>你有多种请求，请指定 proposal 或 invitation。</yellow>",
+  "request-ambiguous": "<yellow>有多张有效请帖，请使用 /marry menu invitation 选择具体婚礼。</yellow>",
   "proposal-denied": "<gray>已拒绝请求。</gray>",
   "engaged": "<gradient:#FABD94:#EBA1CC>订婚成功，有效期 {hours} 小时；可 /marry cancel 取消。</gradient>",
   "married": "<gradient:#FFD594:#F495BA>祝福 {player1} 与 {player2} 正式结为伴侣！</gradient>",
@@ -36,7 +32,9 @@
   "divorce-withdrawn": "<gradient:#9CDCC4:#9FBFED>已撤销离婚申请。</gradient>",
   "divorced": "<gray>婚姻已结束，再婚冷却已开始。</gray>",
   "engagement-expired": "<gray>订婚已过期，可重新求婚。</gray>",
-  "info": "<gradient:#EEAAC9:#B2A3EF>{player1} ♥ {player2}</gradient><newline><gray>状态：{state} ｜ 羁绊：{level}·{title} ｜ 羁绊值：{bond}<newline>结婚 {days} 天 ｜ 共同在线 {hours} 小时</gray>",
+  "info": "<gradient:#EEAAC9:#B2A3EF>{player1} ♥ {player2}</gradient><newline><gray>状态：{state} ｜ 羁绊：{level}·{title} ｜ 羁绊值：{bond}<newline>结婚 {days} 天 ｜ 共同在线 {hours} 小时<newline>属性加成：生命上限 +{max-health} ｜ 攻击 +{attack-damage} ｜ 移速 +{movement-speed}</gray>",
+  "partner-info-name": "伴侣：{player}",
+  "partner-info-description": "羁绊等级 {level}·{title} ｜ 羁绊值 {bond} ｜ 生命上限 +{max-health} ｜ 攻击 +{attack-damage} ｜ 移速 +{movement-speed}",
   "wedding-required": "<yellow>仅婚礼订婚状态可筹备仪式。</yellow>",
   "wedding-point-set": "<green>已保存婚礼位置 {role}。</green>",
   "wedding-location-required": "<yellow>请设置场地、nx、nl、ly 及足够的宾客座位。</yellow>",
@@ -186,7 +184,9 @@
   "task-entry-name": "第{cycle}轮 · 第{day}天 · {task}",
   "task-entry-description": "{status} | 今日进度 {progress}/{target} | 完成 +{bond} 羁绊",
   "task-other-description": "{status} | 目标 {target} | 完成 +{bond} 羁绊",
-  "rank-select-description": "点击查看榜单；榜内返回按钮可切换类型",
+  "rank-select-description": "点击查看榜单；可使用 /marry rank ＜类型＞ 切换榜单",
+  "help-menu": "<gray>/marry menu [界面] [关键词] — 打开独立菜单；propose/send_invite 按玩家名搜索，gift/invitation 按名称或编号搜索；无参数打开主菜单</gray>",
+  "reload-refresh-failed": "<red>配置和数据库已生效，但部分运行状态刷新失败；请管理员查看控制台并重启服务器。</red>",
   "rank-entry-name": "#{rank} {player1} ♥ {player2}",
   "rank-metric-bond": "羁绊等级 {level} | 羁绊值 {value}",
   "rank-metric-duration": "结婚 {value} 天 | 羁绊等级 {level}",
@@ -196,6 +196,19 @@
   "partner-teleport-failed": "<red>伴侣传送未完成，已结束本次请求；请稍后重试。</red>",
   "partner-teleport-timeout": "<yellow>传送结果尚未确认，已停止等待。为避免重复传送，本次冷却保留。</yellow>",
   "admin-help-title": "<gradient:#EDBE8C:#C6A4E8>结婚系统管理帮助</gradient>",
-  "help-acceptinvitation": "<gray>/marry acceptinvitation — 接受有效的婚礼请帖</gray>",
-  "help-denyinvitation": "<gray>/marry denyinvitation — 拒绝有效的婚礼请帖</gray>"
+  "help-acceptinvitation": "<gray>/marry acceptinvitation [婚礼编号] — 接受有效请帖；多张请帖可在 /marry menu invitation 选择</gray>",
+  "help-denyinvitation": "<gray>/marry denyinvitation [婚礼编号] — 拒绝对应请帖；拒绝后需要新人重新邀请</gray>",
+  "menu-loading": "<aqua>正在读取菜单内容…</aqua>",
+  "menu-overflow": "<yellow>当前显示 {shown}/{total} 条；可用 /marry menu {page} ＜名称或编号＞ 缩小范围。领取箱也可用 /marry claim 查看完整文字列表。</yellow>",
+  "menu-invitation-name": "{player1} ♥ {player2} 的婚礼",
+  "menu-invitation-description": "婚礼编号：{id}",
+  "menu-invitation-hint": "左键接受；右键拒绝此张请帖",
+  "menu-inbox-reward-id": "纪念日奖励",
+  "menu-inbox-reward-weekly-id": "情侣周榜奖励",
+  "menu-inbox-gift-id": "伴侣礼物",
+  "menu-inbox-wedding-gift-id": "婚礼贺礼",
+  "menu-inbox-reward-review-id": "奖励待核对",
+  "menu-inbox-delivery-review": "礼物待核对",
+  "menu-claim-hint": "左键领取此项；领取后物品、经验或余额会改变",
+  "menu-review-hint": "等待管理员核对；此项不可点击领取"
 }

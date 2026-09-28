@@ -8,11 +8,11 @@ import java.nio.file.*;
 import java.util.*;
 import java.util.function.Function;
 /** SQL、事务和方言均绑定此连接池实例。业务只传递不可变数据。 */
-public class JdbcMarriageRepository implements MarriageRepository {
- private final HikariDataSource pool;private final ThreadLocal<Connection> tx=new ThreadLocal<>();
- public JdbcMarriageRepository(DatabaseSettings s){
+ public class JdbcMarriageRepository implements MarriageRepository {
+ private final HikariDataSource pool;private final String type;private final ThreadLocal<Connection> tx=new ThreadLocal<>();
+ public JdbcMarriageRepository(DatabaseSettings s){ type=s.type();
   HikariConfig cfg=new HikariConfig();cfg.setMaximumPoolSize(s.type().equals("SQLITE")?1:s.poolSize());cfg.setMinimumIdle(1);cfg.setConnectionTimeout(s.timeout());cfg.setInitializationFailTimeout(s.timeout());cfg.setPoolName("Xiyuan-"+UUID.randomUUID());
-  try{if(s.type().equals("SQLITE")){Path p=s.file().toAbsolutePath();Files.createDirectories(p.getParent());var ds=new SQLiteDataSource();ds.setUrl("jdbc:sqlite:"+p);cfg.setDataSource(ds);cfg.setConnectionInitSql("PRAGMA busy_timeout=5000");}else{var ds=new MysqlDataSource();ds.setURL("jdbc:mysql://"+s.host()+":"+s.port()+"/"+s.database()+"?"+s.parameters());ds.setUser(s.username());ds.setPassword(s.password());cfg.setDataSource(ds);}}catch(Exception e){throw new IllegalStateException("数据库配置初始化失败",e);}
+  try{if(s.type().equals("SQLITE")){Path p=s.file().toAbsolutePath();Files.createDirectories(p.getParent());var ds=new SQLiteDataSource();ds.setUrl("jdbc:sqlite:"+p);cfg.setDataSource(ds);cfg.setConnectionInitSql("PRAGMA busy_timeout=5000");}else{var ds=new MysqlDataSource();String params=s.parameters();if(!params.toLowerCase(Locale.ROOT).contains("useaffectedrows="))params+=(params.isBlank()?"":"&")+"useAffectedRows=false";ds.setURL("jdbc:mysql://"+s.host()+":"+s.port()+"/"+s.database()+"?"+params);ds.setUser(s.username());ds.setPassword(s.password());cfg.setDataSource(ds);}}catch(Exception e){throw new IllegalStateException("数据库配置初始化失败",e);}
   pool=new HikariDataSource(cfg);try{migrate();}catch(RuntimeException e){pool.close();throw e;}
  }
  private interface SqlWork<T>{T run(Connection c)throws SQLException;}
@@ -47,7 +47,8 @@ public class JdbcMarriageRepository implements MarriageRepository {
  @Override public int completeDueDivorces(long now){return transaction(r->{int n=0;for(var m:findAll())if(m.state()==MarriageState.DIVORCE_PENDING&&m.divorceAt()<=now){deleteMarriage(m.playerOne());n++;}return n;});}
  @Override public String get(String bucket,String key){return scalar("SELECT payload FROM xym_metadata WHERE bucket=? AND entry_key=?",bucket,key);}
  @Override public Map<String,String> entries(String bucket){return sql(c->{var out=new HashMap<String,String>();try(var ps=c.prepareStatement("SELECT entry_key,payload FROM xym_metadata WHERE bucket=?")){bind(ps,bucket);try(var rs=ps.executeQuery()){while(rs.next())out.put(rs.getString(1),rs.getString(2));}}return Map.copyOf(out);});}
- @Override public void put(String bucket,String key,String value){if(update("UPDATE xym_metadata SET payload=? WHERE bucket=? AND entry_key=?",value,bucket,key)==0)update("INSERT INTO xym_metadata(bucket,entry_key,payload) VALUES(?,?,?)",bucket,key,value);}
+ @Override public void put(String bucket,String key,String value){if(databaseType().equals("MYSQL")){update("INSERT INTO xym_metadata(bucket,entry_key,payload) VALUES(?,?,?) ON DUPLICATE KEY UPDATE payload=?",bucket,key,value,value);}else if(update("UPDATE xym_metadata SET payload=? WHERE bucket=? AND entry_key=?",value,bucket,key)==0)update("INSERT INTO xym_metadata(bucket,entry_key,payload) VALUES(?,?,?)",bucket,key,value);}
+ private String databaseType(){return type;}
  @Override public void remove(String bucket,String key){update("DELETE FROM xym_metadata WHERE bucket=? AND entry_key=?",bucket,key);}
  @Override public void close(){pool.close();}
  public boolean closed(){return pool.isClosed();}

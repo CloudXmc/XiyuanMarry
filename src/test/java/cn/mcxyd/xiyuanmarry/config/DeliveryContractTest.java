@@ -16,7 +16,8 @@ class DeliveryContractTest {
     @Test void allGuiResourcesParseKeepBorderAndTeachActions()throws Exception {
         for(String name:ConfigurationManager.GUI_NAMES){
             var y=read("gui/"+name+".yml");var layout=GuiLayout.parse(y);
-            assertTrue(layout.size()>=9&&layout.size()<=54);assertFalse(layout.icons().containsKey('A'));
+            assertEquals(45,layout.size());assertFalse(layout.icons().containsKey('A'));
+            assertFalse(layout.icons().containsKey('P'));assertFalse(layout.icons().containsKey('N'));assertFalse(layout.icons().containsKey('F'));
             var border=layout.icons().get('#');assertEquals("WHITE_STAINED_GLASS_PANE",border.material().name());
             assertEquals("§e✧ 闪闪发光的边框 ✧",border.name());
             assertEquals(List.of("§7嘿嘿嘿～","§7戳我干嘛呀小坏蛋～"),border.lore());

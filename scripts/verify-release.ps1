@@ -1,4 +1,4 @@
-﻿param([string]$Version = '2.8.3')
+param([string]$Version = '2.10.0')
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 Set-Location -LiteralPath $root
@@ -65,6 +65,9 @@ $result = [ordered]@{
 }
 $result | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $output "verification-$Version.json") -Encoding utf8
 [ordered]@{version=$Version; tests=$result.tests; jarEntries=$entries.Count; javaClassMajor=$major; foreignClasses=$foreign.Count; report="outputs/verification-$Version.json"} | ConvertTo-Json -Depth 6
+
+
+
 
 
 

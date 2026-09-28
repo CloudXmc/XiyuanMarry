@@ -1,14 +1,13 @@
-# 结婚系统 GUI：默认值如下；layout 为1–6行，每行9字符，A为空槽。
-# 修改后 reload 并重新打开生效，不影响已有数据；action 仅限内置动作。
+# 45 格 GUI：layout 默认 5 行，每行 9 字符；A 为空槽，D 为动态条目，# 为分隔板。icons 定义名称、材质、教学 lore 和内置 action，禁止任意脚本。底部默认 #########。
+# sounds 为打开/点击/关闭资源键；volume 范围 (0,4]、默认 1；pitch 范围 (0,2]、默认 1。修改后 reload 并重新打开生效，不影响历史数据。
 {
   "title": "<gradient:#F5ADCD:#B5A4F0>领取箱与贺礼</gradient>",
   "layout": [
-    "#########",
+    "DDDDDDDDD",
     "#DDDDDDD#",
     "#DDDDDDD#",
     "#DDDDDDD#",
-    "#AAAAAAA#",
-    "P###F###N"
+    "#########"
   ],
   "icons": {
     "#": {
@@ -28,53 +27,21 @@
       "material": "PAPER",
       "lore": [
         "<gray>{entry.description}</gray>",
-        "<yellow>左键点击使用</yellow>"
+        "<yellow>{entry.hint}</yellow>",
+        "<red>请确认背包有空间；待核对条目不能重复领取。</red>"
       ],
       "action": "select",
       "isEnchant": false,
       "custom-model-data": 0,
       "hideFlag": true,
       "hideEnchant": true
-    },
-    "P": {
-      "name": "<gradient:#F5ADCD:#B5A4F0>上一页</gradient>",
-      "material": "ARROW",
-      "lore": [
-        "<gray>查看上一页内容。</gray>",
-        "<yellow>左键点击使用</yellow>"
-      ],
-      "action": "previous-page",
-      "isEnchant": false,
-      "custom-model-data": 0,
-      "hideFlag": true,
-      "hideEnchant": true
-    },
-    "N": {
-      "name": "<gradient:#F5ADCD:#B5A4F0>下一页</gradient>",
-      "material": "ARROW",
-      "lore": [
-        "<gray>查看下一页内容。</gray>",
-        "<yellow>左键点击使用</yellow>"
-      ],
-      "action": "next-page",
-      "isEnchant": false,
-      "custom-model-data": 0,
-      "hideFlag": true,
-      "hideEnchant": true
-    },
-    "F": {
-      "name": "<gradient:#F5ADCD:#B5A4F0>返回</gradient>",
-      "material": "OAK_DOOR",
-      "lore": [
-        "<gray>返回上级菜单；主菜单默认执行 /mc。</gray>",
-        "<yellow>左键点击使用</yellow>"
-      ],
-      "action": "back",
-      "isEnchant": false,
-      "custom-model-data": 0,
-      "hideFlag": true,
-      "hideEnchant": true,
-      "return-command": "/mc"
     }
+  },
+  "sounds": {
+    "open": "minecraft:block.chest.open",
+    "click": "minecraft:ui.button.click",
+    "close": "minecraft:block.chest.close",
+    "volume": 1.0,
+    "pitch": 1.0
   }
 }

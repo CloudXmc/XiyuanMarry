@@ -3,6 +3,7 @@
 # 小时范围 1-8760，再婚冷却允许0；在线分钟0-1000000，每日次数1-1000，超时秒1-86400。
 # 池大小1-32（SQLite固定1），连接超时1000-60000毫秒；修改数据库参数会更换连接池。
 # 消息使用 MiniMessage，{占位符}按纯文本替换；语言文件仅影响展示。
+# bond.attributes：情侣等级属性加成；enabled 控制开关；per-level 为每提升一级（从1级起）的增量；reload 生效。
 {
   "identity": {
     "mode": "OFFLINE_NAME",
@@ -38,6 +39,14 @@
     "invite-expire-hours": 24
   },
   "bond": {
+    "attributes": {
+      "enabled": true,
+      "per-level": {
+        "max-health": 1.0,
+        "attack-damage": 0.25,
+        "movement-speed": 0.005
+      }
+    },
     "common-online-enabled": true,
     "common-online-per-hour": 10,
     "first-together-login": 8,
@@ -104,3 +113,5 @@
   },
   "timezone": "Asia/Shanghai"
 }
+
+

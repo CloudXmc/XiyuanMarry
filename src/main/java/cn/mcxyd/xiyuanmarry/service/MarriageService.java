@@ -4,6 +4,7 @@ import com.google.gson.Gson;import org.bukkit.Bukkit;import org.bukkit.command.C
 import java.time.*;import java.util.*;import java.util.concurrent.*;import java.util.function.*;import static cn.mcxyd.xiyuanmarry.service.RuleViolation.require;
 /** 婚姻事务编排。命令和GUI复用相同资格检查，任何成功提示都在提交后发送。 */
 public final class MarriageService {
+ private final Object lifecycle=new Object();
  public record View(Map<UUID,MarriageRecord> byPlayer,Map<UUID,PlayerProfile> profiles,List<MarriageRecord> couples,Map<String,String> metadata){public View{byPlayer=Map.copyOf(byPlayer);profiles=Map.copyOf(profiles);couples=List.copyOf(couples);metadata=Map.copyOf(metadata);}}
  private final JavaPlugin plugin;private final ConfigurationManager config;private final MessageService messages;private final DatabaseManager database;private final UnifiedScheduler scheduler;private final IoDispatcher io;private final PlayerDirectory directory;private final Gson gson=new Gson();private final Set<UUID> busy=ConcurrentHashMap.newKeySet();private volatile View view=new View(Map.of(),Map.of(),List.of(),Map.of());private volatile boolean closed;private TaskHandle timer;private Runnable afterReload=()->{};
  public MarriageService(JavaPlugin p,ConfigurationManager c,MessageService m,DatabaseManager db,UnifiedScheduler s,IoDispatcher io,PlayerDirectory d){plugin=p;config=c;messages=m;database=db;scheduler=s;this.io=io;directory=d;}
@@ -57,7 +58,8 @@ public final class MarriageService {
   });
   if(!accepted){if(actor!=null)busy.remove(actor);notifyLive(actor,"busy");failed.accept(new IllegalStateException("IO队列已满"));}
  }
- private void refresh(MarriageRepository r){var list=r.findAll();var map=new HashMap<UUID,MarriageRecord>();for(var m:list){map.put(m.playerOne(),m);map.put(m.playerTwo(),m);}var profiles=new HashMap<UUID,PlayerProfile>();for(var raw:r.entries("profiles").values()){var p=gson.fromJson(raw,PlayerProfile.class);profiles.put(p.id(),p);}view=new View(map,profiles,list,r.entries("settings"));}
+ private View loadView(MarriageRepository r){var list=r.findAll();var map=new HashMap<UUID,MarriageRecord>();for(var m:list){map.put(m.playerOne(),m);map.put(m.playerTwo(),m);}var profiles=new HashMap<UUID,PlayerProfile>();for(var raw:r.entries("profiles").values()){var p=gson.fromJson(raw,PlayerProfile.class);profiles.put(p.id(),p);}return new View(map,profiles,list,r.entries("settings"));}
+ private void refresh(MarriageRepository r){var next=loadView(r);synchronized(lifecycle){if(!closed)view=next;}}
  public void addBond(UUID id,long amount){if(amount>0)submit(null,r->{return r.addBond(id,amount);},x->{});}
  public void register(PlayerSnapshot p){submit(null,r->{var old=r.get("profiles",p.id().toString());String name=p.name();if(old!=null&&!config.config().getBoolean("identity.save-last-known-name",true))name=gson.fromJson(old,PlayerProfile.class).name();r.put("profiles",p.id().toString(),gson.toJson(new PlayerProfile(p.id(),p.identityKey(),name,p.liveId())));return null;},x->{});}
  private void eligible(MarriageRepository r,PlayerSnapshot a,PlayerSnapshot b){require(a!=null&&b!=null,"offline");require(!a.id().equals(b.id()),"self-proposal");require(directory.identity(a.id())!=null&&directory.identity(b.id())!=null,"offline");require(r.findByPlayer(a.id())==null&&r.findByPlayer(b.id())==null,"already-married");require(number(r,"cooldowns",a.id().toString())<=System.currentTimeMillis()&&number(r,"cooldowns",b.id().toString())<=System.currentTimeMillis(),"cooldown");require(a.onlineMinutes()>=setting("marriage.minimum-online-minutes",30)&&b.onlineMinutes()>=setting("marriage.minimum-online-minutes",30),"minimum-online");require(r.get("blocks",b.id()+":"+a.id())==null,"blocked");}
@@ -69,16 +71,46 @@ public final class MarriageService {
  public void block(PlayerSnapshot p,UUID target,boolean blocked){submit(p.liveId(),r->{String key=p.id()+":"+target;if(blocked)r.put("blocks",key,"1");else r.remove("blocks",key);return null;},x->notifyLive(p.liveId(),"block-set"));}
  public void completeWedding(UUID one,UUID two){submit(null,r->{var m=r.findByPlayer(one);require(m!=null&&m.state()==MarriageState.ENGAGED&&m.partnerOf(one).equals(two)&&m.createdAt()+setting("marriage.engagement-hours",48)*3600000>System.currentTimeMillis(),"wedding-required");require(r.completeMarriage(one,two,"WEDDING",System.currentTimeMillis()),"wedding-required");return r.findByPlayer(one);},this::announce);}
  private void announce(MarriageRecord m){broadcast("married","player1",name(m.playerOne()),"player2",name(m.playerTwo()));}
- public void info(CommandSender sender,UUID id){var m=view.byPlayer().get(id);if(m==null){messages.send(sender,"not-married");return;}int lvl=level(m.bond());messages.send(sender,"info","player1",name(m.playerOne()),"player2",name(m.playerTwo()),"state",messages.raw("state-"+m.state().name().toLowerCase(Locale.ROOT)),"level",lvl,"title",title(lvl),"bond",m.bond(),"days",m.married()?Math.max(0,(System.currentTimeMillis()-m.marriedAt())/86400000):0,"hours",m.sharedSeconds()/3600);}
- public UUID identityByName(String value){var online=directory.name(value);if(online!=null)return online.id();return view.profiles().values().stream().filter(p->p.name().equalsIgnoreCase(value)).map(PlayerProfile::id).findFirst().orElse(null);}
- public void admin(UUID actor,String action,UUID a,UUID b,long amount){submit(actor,r->{switch(action){case "force"->require(r.createMarriage(a,b,"ADMIN",System.currentTimeMillis()),"already-married");case "divorce","clear"->{var m=r.findByPlayer(a);require(m!=null,"not-married");end(r,m,System.currentTimeMillis());}case "setexp"->require(r.setBond(a,amount),"not-married");case "setlevel"->{require(amount>=1&&amount<=10,"invalid-argument");require(r.setBond(a,config.config().getLong("bond.levels."+amount+".required")),"not-married");}default->throw new RuleViolation("invalid-argument");}return null;},x->{if(actor!=null)notifyLive(actor,"admin-success");else scheduler.runGlobal(()->messages.send(Bukkit.getConsoleSender(),"admin-success"));});}
+ public void info(CommandSender sender,UUID id){var m=view.byPlayer().get(id);if(m==null){messages.send(sender,"not-married");return;}int lvl=level(m.bond());var bonus=BondAttributeService.calculate(lvl,config.config().getBoolean("bond.attributes.enabled",true)&&m.state()==MarriageState.MARRIED,config.config().getDouble("bond.attributes.per-level.max-health",1.0),config.config().getDouble("bond.attributes.per-level.attack-damage",0.25),config.config().getDouble("bond.attributes.per-level.movement-speed",0.005));messages.send(sender,"info","player1",name(m.playerOne()),"player2",name(m.playerTwo()),"state",messages.raw("state-"+m.state().name().toLowerCase(Locale.ROOT)),"level",lvl,"title",title(lvl),"bond",m.bond(),"days",m.married()?Math.max(0,(System.currentTimeMillis()-m.marriedAt())/86400000):0,"hours",m.sharedSeconds()/3600,"max-health",formatBonus(bonus.maxHealth()),"attack-damage",formatBonus(bonus.attackDamage()),"movement-speed",formatBonus(bonus.movementSpeed()));}
+ private String formatBonus(double value){return String.format(Locale.ROOT,"%.3f",value);} public UUID identityByName(String value){var online=directory.name(value);if(online!=null)return online.id();return view.profiles().values().stream().filter(p->p.name().equalsIgnoreCase(value)).map(PlayerProfile::id).findFirst().orElse(null);}
+ public void admin(UUID actor,String action,UUID a,UUID b,long amount){submit(actor,r->{switch(action){case "force"->require(r.createMarriage(a,b,"ADMIN",System.currentTimeMillis()),"already-married");case "divorce","clear"->{var m=r.findByPlayer(a);require(m!=null,"not-married");end(r,m,System.currentTimeMillis());}case "setexp"->{require(amount>=0,"invalid-argument");require(r.setBond(a,amount),"not-married");}case "setlevel"->{require(amount>=1&&amount<=10,"invalid-argument");require(r.setBond(a,config.config().getLong("bond.levels."+amount+".required")),"not-married");}default->throw new RuleViolation("invalid-argument");}return null;},x->notifyAdministrator(actor,"admin-success"),error->{
+  if(actor!=null)return;
+  Throwable reason=error;while(reason instanceof TransactionRollbackException&&reason.getCause()!=null)reason=reason.getCause();
+  notifyAdministrator(null,reason instanceof RuleViolation rule?rule.key():"internal-error");
+ });}
+ private void notifyAdministrator(UUID actor,String key){if(closed)return;if(actor!=null)notifyLive(actor,key);else scheduler.runGlobal(()->{if(!closed)messages.send(Bukkit.getConsoleSender(),key);});}
  private void end(MarriageRepository r,MarriageRecord m,long now){long until=now+setting("marriage.remarriage-cooling-hours",24)*3600000;r.put("cooldowns",m.playerOne().toString(),Long.toString(until));r.put("cooldowns",m.playerTwo().toString(),Long.toString(until));r.deleteMarriage(m.playerOne());r.remove("weddings",m.id());}
  private void maintain(MarriageRepository r,long now){for(var m:r.findAll()){if(m.state()==MarriageState.ENGAGED&&m.createdAt()+setting("marriage.engagement-hours",48)*3600000<=now){r.deleteMarriage(m.playerOne());r.remove("weddings",m.id());}else if(m.state()==MarriageState.DIVORCE_PENDING&&m.divorceAt()<=now)end(r,m,m.divorceAt());}for(var e:r.entries("proposals").entrySet())if(gson.fromJson(e.getValue(),Proposal.class).expiresAt()<=now)r.remove("proposals",e.getKey());for(var e:r.entries("cooldowns").entrySet())if(Long.parseLong(e.getValue())<=now)r.remove("cooldowns",e.getKey());String cutoff=today().minusDays(7).toString();for(String k:r.entries("daily").keySet())if(k.compareTo(cutoff)<0)r.remove("daily",k);}
  public static long number(MarriageRepository r,String bucket,String key){String v=r.get(bucket,key);return v==null?0:Long.parseLong(v);}
  public void leave(UUID live,UUID id){busy.remove(live);submit(null,r->{for(var e:r.entries("proposals").entrySet()){var q=gson.fromJson(e.getValue(),Proposal.class);if(q.proposer().equals(id)||q.target().equals(id))r.remove("proposals",e.getKey());}return null;},x->{});}
- public void reload(UUID actor){if(!io.submit(()->{try{var next=config.prepare();String oldMode=config.config().getString("identity.mode");boolean switched=database.switchTo(next.database());config.publish(next);database.use(r->{refresh(r);return null;});directory.refresh();afterReload.run();notifyLive(actor,"reload-success");if(switched)notifyLive(actor,"database-switched");if(!oldMode.equals(config.config().getString("identity.mode")))broadcast("identity-changed");if(actor==null)scheduler.runGlobal(()->messages.send(Bukkit.getConsoleSender(),switched?"database-switched":"reload-success"));}catch(Exception e){plugin.getLogger().log(java.util.logging.Level.SEVERE,"重载校验失败，旧配置继续有效",e);notifyLive(actor,"reload-failed");if(actor==null)scheduler.runGlobal(()->messages.send(Bukkit.getConsoleSender(),"reload-failed"));}}))notifyLive(actor,"busy");}
- public void shutdown(){closed=true;if(timer!=null)timer.cancel();busy.clear();}
+ public void reload(UUID actor){
+  if(closed)return;
+  if(!io.submit(()->{
+   if(closed)return;
+   var previous=config.snapshot();ConfigurationManager.Snapshot next;DatabaseManager.SwitchResult<View> result;
+   try{
+    next=config.prepare();
+    result=database.switchTo(next.database(),r->{var candidate=loadView(r);if(closed)throw new IllegalStateException("插件已关闭");return candidate;});
+   }catch(Exception error){
+    plugin.getLogger().log(java.util.logging.Level.SEVERE,"重载校验失败，继续使用原配置和数据库",error);
+    notifyAdministrator(actor,"reload-failed");return;
+   }
+   // IO 串行队列内完成数据库校验；这里只发布内存快照，不持有锁执行 IO 或跨区调度。
+   synchronized(lifecycle){if(closed)return;config.publish(next);view=result.value();}
+   if(result.switched())notifyAdministrator(actor,"database-switched");
+   if(!Objects.equals(previous.files().get("config.yml").getString("identity.mode"),next.files().get("config.yml").getString("identity.mode")))broadcast("identity-changed");
+   try{directory.refresh();afterReload.run();}
+   catch(RuntimeException error){
+    // 发布后新请求可能已开始，不能重新打开旧库冒充原代次，否则会破坏领取令牌。
+    plugin.getLogger().log(java.util.logging.Level.SEVERE,"配置和数据库已发布，但运行状态刷新失败；请检查异常并重启",error);
+    notifyAdministrator(actor,"reload-refresh-failed");return;
+   }
+   notifyAdministrator(actor,"reload-success");
+  }))notifyAdministrator(actor,"busy");
+ }
+ public void shutdown(){synchronized(lifecycle){closed=true;busy.clear();view=new View(Map.of(),Map.of(),List.of(),Map.of());afterReload=()->{};}if(timer!=null)timer.cancel();}
 }
+
 
 
 

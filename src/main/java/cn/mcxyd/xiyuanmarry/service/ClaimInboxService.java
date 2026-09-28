@@ -28,6 +28,13 @@ public final class ClaimInboxService implements AutoCloseable {
     }
 
     public void list(PlayerSnapshot actor) {
+        load(actor,(player,result)->{
+            for(var notice:result)messages.send(player,notice.key(),notice.values().toArray());
+        });
+    }
+
+    /** 同一读取流程服务聊天和 GUI；consumer 只在玩家实体所有者上下文调用。 */
+    public void load(PlayerSnapshot actor,java.util.function.BiConsumer<org.bukkit.entity.Player,List<InboxMessage>> consumer) {
         if (closed) return;
         UUID databaseGeneration = database.generation(), configGeneration = config.snapshot().generation();
         marriages.submit(actor.liveId(), repository -> {
@@ -42,7 +49,7 @@ public final class ClaimInboxService implements AutoCloseable {
                 var live = marriages.directory().live(actor.liveId());
                 if (live == null || !live.id().equals(actor.id()) || !live.identityKey().equals(actor.identityKey())) return;
                 // 已回到玩家实体上下文，直接输出同一批快照，避免再排队产生旧结果窗口。
-                for (var notice : result) messages.send(player, notice.key(), notice.values().toArray());
+                consumer.accept(player,result);
             });
         });
     }

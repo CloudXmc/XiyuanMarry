@@ -34,6 +34,7 @@ public final class RingService implements AutoCloseable {
     private final NamespacedKey ringKey;
     private final MessageService messages;
     private final ConcurrentHashMap<UUID, Boolean> enabled = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<UUID, UUID> pending = new ConcurrentHashMap<>();
     private volatile TaskHandle task;
     private volatile boolean closed;
 
@@ -48,11 +49,13 @@ public final class RingService implements AutoCloseable {
         this.ringKey = new NamespacedKey(plugin, "ring-type");
     }
 
-    public void start() {
+    public synchronized void start() {
+        if(closed||task!=null)return;
         task = scheduler.runRepeatingAsync(this::tick, 1, 2, TimeUnit.SECONDS);
     }
 
     public boolean toggle(PlayerSnapshot actor) {
+        if(closed)return false;
         boolean next = !enabled.getOrDefault(actor.id(), true);
         enabled.put(actor.id(), next);
         marriages.notifyLive(actor.liveId(), "ring-toggle", "state", messages.raw(next ? "on" : "off"));
@@ -64,6 +67,9 @@ public final class RingService implements AutoCloseable {
     }
 
     public void give(CommandSender sender, UUID target, String rawType) {
+        if (closed) return;
+        // 在指令发起者上下文读取身份，目标玩家回调不再持有或读取发起者 Player。
+        UUID senderId = sender instanceof Player player ? player.getUniqueId() : null;
         String type = rawType.toLowerCase(Locale.ROOT);
         if (!type.equals(ENGAGEMENT) && !type.equals(MARRIAGE)) {
             messages.send(sender, "invalid-argument");
@@ -75,15 +81,16 @@ public final class RingService implements AutoCloseable {
             return;
         }
         scheduler.player(recipient.liveId(), player -> {
+            if (closed) return;
             if (player.getInventory().firstEmpty() < 0) {
                 messages.send(player, "inventory-full");
-                notifySender(sender, "inventory-full");
+                notifySender(senderId, "inventory-full");
                 return;
             }
             player.getInventory().setItem(player.getInventory().firstEmpty(), create(type));
             marriages.notifyLive(recipient.liveId(), "ring-given", "type", messages.raw("ring-" + type));
-            notifySender(sender, "ring-give-success", "player", recipient.name(), "type", messages.raw("ring-" + type));
-        }, () -> messages.send(sender, "offline"));
+            notifySender(senderId, "ring-give-success", "player", recipient.name(), "type", messages.raw("ring-" + type));
+        }, () -> notifySender(senderId, "offline"));
     }
 
     private ItemStack create(String type) {
@@ -101,10 +108,30 @@ public final class RingService implements AutoCloseable {
 
     private void tick() {
         if (closed) return;
-        for (PlayerSnapshot snapshot : directory.all()) scheduler.player(snapshot.liveId(), player -> apply(player, snapshot));
+        var online=directory.all();
+        var identities=new java.util.HashSet<UUID>();
+        online.forEach(snapshot->identities.add(snapshot.id()));
+        enabled.keySet().retainAll(identities);
+        for (PlayerSnapshot snapshot : online) {
+            UUID live=snapshot.liveId(),token=UUID.randomUUID();
+            synchronized(this){
+                if(closed)return;
+                if(pending.putIfAbsent(live,token)!=null)continue;
+            }
+            // 每名玩家最多一项待执行回调；退休/失败也释放标记，防止卡顿区域累积任务。
+            try{scheduler.player(live,player->{
+                try{
+                    if(closed||player.isDead())return;
+                    var current=directory.live(live);
+                    if(current!=null)apply(player,current);
+                }finally{pending.remove(live,token);}
+            },()->pending.remove(live,token));}
+            catch(RuntimeException failure){pending.remove(live,token);throw failure;}
+        }
     }
 
     private void apply(Player player, PlayerSnapshot snapshot) {
+        if (closed) return;
         MarriageRecord marriage = marriages.view().byPlayer().get(snapshot.id());
         PlayerSnapshot partner = marriage == null ? null : directory.identity(marriage.partnerOf(snapshot.id()));
         ItemStack offhand = player.getInventory().getItemInOffHand();
@@ -134,14 +161,16 @@ public final class RingService implements AutoCloseable {
         return type == null ? "" : type;
     }
 
-    private void notifySender(CommandSender sender, String key, Object... values) {
-        if (sender instanceof Player player) scheduler.player(player.getUniqueId(), p -> messages.send(p, key, values));
-        else scheduler.runGlobal(() -> messages.send(sender, key, values));
+    private void notifySender(UUID senderId, String key, Object... values) {
+        if (closed) return;
+        if (senderId != null) scheduler.player(senderId, p -> {if (!closed) messages.send(p, key, values);});
+        else scheduler.runGlobal(() -> {if (!closed) messages.send(org.bukkit.Bukkit.getConsoleSender(), key, values);});
     }
 
-    @Override public void close() {
+    @Override public synchronized void close() {
         closed = true;
         if (task != null) task.cancel();
         enabled.clear();
+        pending.clear();
     }
 }

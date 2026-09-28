@@ -4,6 +4,33 @@ import java.nio.file.*;import java.util.UUID;import java.util.concurrent.*;
 import static org.junit.jupiter.api.Assertions.*;
 class DatabaseSwitchTest {
     @TempDir Path root;
+    @Test void rejectedCandidateClosesOnlyItsOwnPool() {
+        try(var db=new DatabaseManager(DatabaseSettings.sqlite(root.resolve("old.db")))){
+            var generation=db.generation();var old=db.use(r->(JdbcMarriageRepository)r);
+            var candidate=new java.util.concurrent.atomic.AtomicReference<JdbcMarriageRepository>();
+            assertThrows(IllegalArgumentException.class,()->db.switchTo(DatabaseSettings.sqlite(root.resolve("candidate.db")),r->{
+                candidate.set((JdbcMarriageRepository)r);assertEquals(generation,db.generation());assertFalse(old.closed());
+                throw new IllegalArgumentException("候选业务数据无效");
+            }));
+            assertNotNull(candidate.get());assertTrue(candidate.get().closed());assertFalse(old.closed());assertEquals(generation,db.generation());
+        }
+    }
+    @Test void unchangedDatabaseStillValidatesItsSnapshot() {
+        var settings=DatabaseSettings.sqlite(root.resolve("same.db"));
+        try(var db=new DatabaseManager(settings)){
+            var generation=db.generation();var pool=db.use(r->(JdbcMarriageRepository)r);
+            assertThrows(IllegalArgumentException.class,()->db.switchTo(settings,r->{throw new IllegalArgumentException("bad snapshot");}));
+            assertEquals(generation,db.generation());assertFalse(pool.closed());
+            var result=db.switchTo(settings,r->r.findAll().size());assertFalse(result.switched());assertEquals(0,result.value());
+        }
+    }
+    @Test void shutdownDuringValidationRejectsAndClosesCandidate() {
+        try(var db=new DatabaseManager(DatabaseSettings.sqlite(root.resolve("old.db")))){
+            var candidate=new java.util.concurrent.atomic.AtomicReference<JdbcMarriageRepository>();
+            assertThrows(IllegalStateException.class,()->db.switchTo(DatabaseSettings.sqlite(root.resolve("new.db")),r->{candidate.set((JdbcMarriageRepository)r);db.close();return null;}));
+            assertTrue(candidate.get().closed());assertThrows(IllegalStateException.class,db::generation);
+        }
+    }
     @Test void switchCreatesEmptyDatabaseAndPreservesOldData() {
         var first=DatabaseSettings.sqlite(root.resolve("first.db"));var second=DatabaseSettings.sqlite(root.resolve("second.db"));
         UUID one=UUID.randomUUID(),two=UUID.randomUUID();

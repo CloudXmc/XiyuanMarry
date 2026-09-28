@@ -92,10 +92,10 @@ public final class CoupleTaskListener implements Listener, AutoCloseable {
                 if (!resultStillPresent && !inputsUnchanged) record(p, "ANVIL", "*", 1);
             }, 1);
         } else if (top.getType() == InventoryType.BREWING && e.getRawSlot() >= 0 && e.getRawSlot() <= 2) {
-            ItemStack before = top.getItem(e.getRawSlot()); if (empty(before) || top.getHolder() == null) return;
-            String slot = blockKey(top) + ":" + e.getRawSlot(), sig = signature(before); int amount = before.getAmount();
+            int clickedSlot=e.getRawSlot();ItemStack before = top.getItem(clickedSlot); if (empty(before) || top.getHolder() == null) return;
+            String slot = blockKey(top) + ":" + clickedSlot, sig = signature(before); int amount = before.getAmount();
             scheduler.runEntityLater(p, () -> { if (!p.isOnline() || inventorySessions.getOrDefault(id, 0L) != session) return;
-                ItemStack after = p.getOpenInventory().getTopInventory().getItem(e.getRawSlot()); int left = after == null ? 0 : after.getAmount();
+                ItemStack after = p.getOpenInventory().getTopInventory().getItem(clickedSlot); int left = after == null ? 0 : after.getAmount();
                 if (left < amount) { var credit = brewCredits.peek(slot, sig, System.currentTimeMillis());
                     if (credit != null && brewCredits.consume(slot, credit.token(), sig, System.currentTimeMillis())) record(p, "BREW", "*", Math.min(amount - left, 64)); }
             }, 1);
@@ -110,7 +110,7 @@ public final class CoupleTaskListener implements Listener, AutoCloseable {
             if (closed || !(location.getBlock().getState() instanceof BrewingStand stand)) return;
             BrewerInventory contents = stand.getInventory();
             for (int i = 0; i < Math.min(3, expected.size()); i++) {
-                ItemStack current = e.getContents().getItem(i);
+                ItemStack current = contents.getItem(i);
                 if (!empty(current) && signature(current).equals(expected.get(i))) brewCredits.produce(key + ":" + i, expected.get(i), System.currentTimeMillis());
             }
         }, 1);

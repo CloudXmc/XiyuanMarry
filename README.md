@@ -1,8 +1,12 @@
-# 结婚系统 XiyuanMarry 2.8.3
+# 结婚系统 XiyuanMarry 2.10.0
 
 Paper 1.21.11 / Java 21 / Folia 结婚与情侣养成插件开发版。
 
 
+
+2.10.0：接入请帖管理和领取箱 GUI，支持按名称或编号搜索；修复失效请帖、卡顿区域戒指任务积压、重复定时任务和死亡属性缓存。功能与限制见 AUDIT-2.10.0.md；尚未完成真实 Paper/Folia/MySQL 联调。
+
+2.8.4 起提供 9 份独立的 45 格 GUI YAML；当前默认布局底部保留完整分隔板，移除上一页、下一页和返回按钮。9 个界面均有入口；invitation 支持左键接受、右键拒绝指定请帖，gift 点击复用既有领取状态机；partner_info 显示情侣等级属性。当前默认任务布局可显示 30 天条目。插件标识 XiyuanMarry、主类、包名、命令和权限保持原值。
 
 2.8.3：中文显示名称统一为结婚系统；聊天前缀、帮助标题、戒指说明与主菜单使用 MiniMessage 渐变色。插件标识 XiyuanMarry、主类、包名、命令和权限保持原值。未自定义的旧版默认语言和主菜单标题会在启动或 reload 时更新，自定义文本保留。
 
@@ -16,8 +20,9 @@ Paper 1.21.11 / Java 21 / Folia 结婚与情侣养成插件开发版。
 - `/marry gift` 已支持将主手物品以持久化快照发送给伴侣，`/marry claim [编号]` 使用一次性状态领取；背包不足会恢复领取状态；结果不确定的数据库或进程中断会冻结记录供人工核对，避免重复发放。
 - 任务 GUI 显示今日及 30 天任务，排行榜 GUI 支持羁绊、时长、共同在线和累计羁绊排序。
 - 伴侣传送冷却令牌、异步传送、失败回滚、超时保守保留冷却；情侣私聊。
-- 独立帮助、Tab 补全、管理确认参数、MiniMessage 渐变语言和固定 GUI 分隔板。
+- 独立帮助、主指令及部分参数 Tab 补全、管理确认参数、MiniMessage 渐变语言和固定 GUI 分隔板；管理子指令的参数补全尚不完整。
 - PlaceholderAPI 软依赖适配：婚姻状态、伴侣、羁绊等级/称号/数值、结婚天数、四类榜单字段与个人榜单名次。
+- 情侣等级属性：沿用 1-10 级羁绊，按配置为已婚双方提供生命上限、攻击伤害和移动速度临时加成；降级、离婚、退出与 reload 会重算或清理。
 - 戒指系统：管理员可发放订婚/结婚戒指；结婚戒指放在副手、开启 `/marry ring` 且伴侣在同世界 20 格内时给予速度与抗性 Buff，效果和材质均可配置。
 - 跨世界传送入口统一收口到 `UnifiedScheduler` 的 UUID/坐标接口，婚礼和伴侣传送业务不再直接创建 `World/Location`。
 - 纪念日奖励出站箱：按 `rewards.yml` 的结婚天数一次性生成奖励票据，通过 `/marry claim` 领取经验和配置指令；未安装 Vault 时金币奖励会冻结，不会静默丢失。
@@ -36,6 +41,10 @@ Paper 1.21.11 / Java 21 / Folia 结婚与情侣养成插件开发版。
 - IO 队列保持 1024 项容量和串行顺序；调度被拒绝时撤销本次入队，调用方可清理 busy；任务异常不自动重跑，后续请求继续执行；关闭清队列、取消工作任务，不等待活动 IO。
 
 当前明确未完成或未做真实运行保证：
+
+- 请帖和领取箱的界面、文字指令均已接入；未做真实客户端的 GUI 外观、声音和多人交互验证。
+- 默认列表可见 30 条；在线玩家、请帖与收件箱可用 /marry menu ＜界面＞ ＜关键词＞ 缩小范围。排行榜仍不提供分页；普通/婚礼模式搜索分别使用 normal/propose。
+- bond.elite-kill、bond.build-ten-blocks、bond.wedding-gift-target、privileges.ring-offhand-required 及 weddings.yml 场地预设尚未被业务读取，修改不能视为生效。
 
 - Vault Economy、PlaceholderAPI 已有适配代码，但未做本轮真实服联调；DecentHolograms 和 ItemsAdder 适配尚未实现。
 - 婚礼贺礼通过 `/marry weddinggift <新人>` 发送；只有已接受对应请帖的宾客能赠送，婚礼完成后夫妻双方按关系 ID 共享查看和领取权。
@@ -56,11 +65,13 @@ PlaceholderAPI 变量使用 `%mythicmarry_变量名%`：
 构建验证以本轮生成的审计报告为准。静态检查、单元测试和 Maven/Gradle 构建成功，不等于真实 Folia 服务端运行测试。
 
 
-可运行 scripts/verify-release.ps1 -Version 2.8.3 检查测试报告、调度候选、元数据、字节码及 JAR 依赖。
+可运行 scripts/verify-release.ps1 -Version 2.10.0 检查测试报告、调度候选、元数据、字节码及 JAR 依赖。
 2.2.0 存在按实时排名重复生成周榜票据的缺陷；升级保留旧票据和发奖记录，不自动撤回或改写已发奖励。
 
 
 
 
 
-2026-09-28 本轮实际验证：Maven -o clean verify 成功；200 项测试、46 个测试类，失败 0、错误 0、跳过 0。verify-release.ps1 通过；JAR 205 条目、Java 21 字节码版本 65、外部依赖类 0。传统调度、绕过统一调度、同步传送、指定不可用事件和阻塞调用扫描均无违规命中。
+2026-09-28 本轮实际验证：Maven -o -B -ntp clean verify 成功；280 项测试、60 个测试类，失败 0、错误 0、跳过 0。verify-release.ps1 通过；JAR 211 条目、Java 字节码 65、外部依赖类 0。 真实 Paper/Folia/MySQL 服务端测试未执行；静态扫描不能证明全部 Region 所有权路径安全。
+
+搜索示例：/marry menu normal Alice（普通结婚）、/marry menu propose Alice（婚礼模式）、/marry menu send_invite Alice、/marry menu invitation Alice、/marry menu gift ＜编号＞。接收和拒绝请帖命令可加婚礼 UUID；默认主菜单增加收到请帖入口，自定义布局保留。
