@@ -22,6 +22,8 @@ class TaskPeriodCardTest {
         assertTrue(layout.icons().containsKey('H'));
         assertEquals(35,layout.dynamicSlots().size());
         assertFalse(layout.dynamicSlots().contains(35));
+        assertEquals('R',layout.rows().get(4).charAt(8));
+        assertEquals("back",layout.icons().get('R').action());
         String slots=String.join("",layout.rows());
         assertEquals(35,slots.indexOf('H'));
         assertEquals(35,slots.lastIndexOf('H'));

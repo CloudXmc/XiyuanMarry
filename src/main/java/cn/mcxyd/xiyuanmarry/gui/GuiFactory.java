@@ -73,8 +73,10 @@ public final class GuiFactory implements AutoCloseable {
             messages.send(owner,"married-required");return;
         }
         messages.send(owner,"task-loaded","task",task.definition().name(),"progress",task.progress(),"target",task.definition().target());
-        render(owner,page,mode,0,content.tasks(task),content.taskPeriodTokens(task,
-            java.time.LocalDate.now(java.time.ZoneId.of(config.config().getString("timezone","Asia/Shanghai")))));
+        var zone = taskZone();
+        var cycleStart = java.time.Instant.ofEpochMilli(current.marriedAt()).atZone(zone).toLocalDate()
+                .plusDays((task.daySerial() / 30L) * 30L);
+        render(owner,page,mode,0,content.tasks(task),content.taskPeriodTokens(task,cycleStart));
     }
     private boolean containsRuleViolation(Throwable error){
         for(Throwable current=error;current!=null;current=current.getCause())
@@ -155,6 +157,7 @@ public final class GuiFactory implements AutoCloseable {
     public void playClick(Player player, XiyuanHolder holder) { var layout=config.snapshot().menus().get(holder.page()); if(layout!=null) playSound(player,layout,layout.sounds().click()); }
     public void playClose(Player player, String page) { var layout=config.snapshot().menus().get(page); if(layout!=null) playSound(player,layout,layout.sounds().close()); }
     private void playSound(Player player, GuiLayout layout, String name) { try { player.playSound(net.kyori.adventure.sound.Sound.sound(net.kyori.adventure.key.Key.key(name), net.kyori.adventure.sound.Sound.Source.MASTER, layout.sounds().volume(), layout.sounds().pitch())); } catch (RuntimeException ex) { config.warn("GUI 音效配置无效："+name); } }
+    private java.time.ZoneId taskZone() { try { return java.time.ZoneId.of(config.config().getString("timezone","Asia/Shanghai")); } catch (RuntimeException invalid) { return java.time.ZoneId.of("Asia/Shanghai"); } }
     public void activate(Player player,XiyuanHolder holder,XiyuanHolder.Action action){
         activate(player,holder,action,false);
     }

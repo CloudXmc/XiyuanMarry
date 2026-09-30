@@ -1,5 +1,5 @@
 package cn.mcxyd.xiyuanmarry.service;
-import cn.mcxyd.xiyuanmarry.model.*;import java.time.*;import java.util.*;
+import cn.mcxyd.xiyuanmarry.model.*;import java.time.*;import java.time.temporal.ChronoUnit;import java.util.*;
 /** 任务计数只接收不可变玩家快照和事件值，监听器不直接做数据库或奖励 IO。 */
 public final class CoupleTaskService {
  public record Event(String type,String value,long amount){}
@@ -10,7 +10,13 @@ public final class CoupleTaskService {
   if(!current.taskType().equals(event.type())||!partnersNear(first,second,distance)||event.amount()<=0)return new Result(current,false,0);
   boolean before=current.completed();var next=current.add(event.amount());return new Result(next,!before&&next.completed(),!before&&next.completed()?reward:0);
  }
- public static int day(long marriedAt,long now){if(now<marriedAt)return 1;return (int)(Duration.ofMillis(now-marriedAt).toDays()%30)+1;}
+ /** 兼容旧调用的默认时区版本；结婚当天为第1天，按自然日切换。 */
+ public static int day(long marriedAt,long now){return day(marriedAt,now,ZoneId.of("Asia/Shanghai"));}
+ public static int day(long marriedAt,long now,ZoneId zone){
+  if(zone==null)return 1;
+  long serial=DailyTaskLedger.daySerial(marriedAt,now,zone);
+  return (int)Math.floorMod(serial,30)+1;
+ }
  public static String cycleKey(String coupleId,int day){return coupleId+":"+day;}
 }
 

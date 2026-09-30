@@ -31,13 +31,13 @@ class DailyTaskCycleCoverageTest {
             assertEquals(20,r.findByPlayer(two).bond());
         }
     }
-    @Test void dayBoundaryAndThirtiethDayUseElapsedTwentyFourHours() {
-        long married=ZonedDateTime.of(2026,9,29,23,58,0,0,ZoneId.of("Asia/Shanghai")).toInstant().toEpochMilli();
-        assertEquals(0,DailyTaskLedger.daySerial(married,married+120_000));
-        assertEquals(0,DailyTaskLedger.daySerial(married,married+86_400_000-1));
-        assertEquals(1,DailyTaskLedger.daySerial(married,married+86_400_000));
-        assertEquals(29,DailyTaskLedger.daySerial(married,married+30L*86_400_000-1));
-        assertEquals(30,DailyTaskLedger.daySerial(married,married+30L*86_400_000));
+    @Test void dayBoundaryAndThirtiethDayUseMarriageLocalCalendarDate() {
+        ZoneId zone=ZoneId.of("Asia/Shanghai");
+        long married=ZonedDateTime.of(2026,9,29,23,58,0,0,zone).toInstant().toEpochMilli();
+        assertEquals(0,DailyTaskLedger.daySerial(married,ZonedDateTime.of(2026,9,29,23,59,59,0,zone).toInstant().toEpochMilli(),zone));
+        assertEquals(1,DailyTaskLedger.daySerial(married,ZonedDateTime.of(2026,9,30,0,0,0,0,zone).toInstant().toEpochMilli(),zone));
+        assertEquals(1,DailyTaskLedger.daySerial(married,ZonedDateTime.of(2026,9,30,23,59,59,0,zone).toInstant().toEpochMilli(),zone));
+        assertEquals(30,DailyTaskLedger.daySerial(married,ZonedDateTime.of(2026,10,29,0,0,0,0,zone).toInstant().toEpochMilli(),zone));
         assertEquals(0,DailyTaskLedger.daySerial(married,married-1));
     }
     @Test void assignedDefinitionAndRewardStayStableAfterConfigChanges() {

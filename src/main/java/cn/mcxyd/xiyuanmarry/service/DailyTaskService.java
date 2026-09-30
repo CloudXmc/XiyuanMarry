@@ -4,13 +4,14 @@ import cn.mcxyd.xiyuanmarry.config.ConfigurationManager;
 import cn.mcxyd.xiyuanmarry.model.*;
 import cn.mcxyd.xiyuanmarry.scheduler.*;
 import java.util.*;
+import java.time.*;
 import java.util.concurrent.*;
 import java.util.function.Consumer;
 
 /** 事件仅传值；每秒批量事务，队列有界，GUI读操作也走异步仓库。 */
 public final class DailyTaskService implements AutoCloseable {
     private record Observation(UUID actor, String relationship, long at, TaskDefinition definition,
-                               CoupleTaskService.Event event, UUID generation, UUID epoch, UUID database) {}
+                               CoupleTaskService.Event event, ZoneId zone, UUID generation, UUID epoch, UUID database) {}
     private record BatchKey(String relationship, long day, String type, String value) {}
     private final MarriageService marriages;
     private final ConfigurationManager config;
@@ -33,12 +34,13 @@ public final class DailyTaskService implements AutoCloseable {
         if (marriage == null || !marriage.married()) return;
         var partner = marriages.directory().identity(marriage.partnerOf(actor.id()));
         var settings = config.snapshot();
+        ZoneId zone = taskZone(settings.files().get("config.yml"));
         long now = System.currentTimeMillis();
         if (!fresh(actor, now) || !fresh(partner, now)
                 || !CoupleTaskService.partnersNear(actor.point(), partner.point(), settings.tasks().distance())) return;
-        var definition = settings.tasks().forDay(DailyTaskLedger.daySerial(marriage.marriedAt(), actor.seenAt()));
+        var definition = settings.tasks().forDay(DailyTaskLedger.daySerial(marriage.marriedAt(), actor.seenAt(), zone));
         if (!pending.offer(new Observation(actor.id(), marriage.id(), actor.seenAt(), definition,
-                new CoupleTaskService.Event(type, value, amount), settings.generation(), epoch, database)))
+                new CoupleTaskService.Event(type, value, amount), zone, settings.generation(), epoch, database)))
             marriages.notifyLive(actor.liveId(), "task-busy");
     }
     /** 供实体采样器复用同一套关系、世界和距离资格判断。 */
@@ -68,11 +70,11 @@ public final class DailyTaskService implements AutoCloseable {
                     || !observation.database().equals(database)) continue;
             var marriage = marriages.view().byPlayer().get(observation.actor());
             if (marriage == null || !marriage.id().equals(observation.relationship())) continue;
-            var key = new BatchKey(marriage.id(), DailyTaskLedger.daySerial(marriage.marriedAt(), observation.at()),
+            var key = new BatchKey(marriage.id(), DailyTaskLedger.daySerial(marriage.marriedAt(), observation.at(), observation.zone()),
                     observation.event().type(), observation.event().value());
             groups.merge(key, observation, (a,b) -> new Observation(a.actor(), a.relationship(), a.at(), a.definition(),
                 new CoupleTaskService.Event(a.event().type(), a.event().value(),
-                    Math.min(1_000_000_000L, Math.min(1_000_000_000L,a.event().amount()) + Math.min(1_000_000_000L,b.event().amount()))), a.generation(), a.epoch(), a.database()));
+                    Math.min(1_000_000_000L, Math.min(1_000_000_000L,a.event().amount()) + Math.min(1_000_000_000L,b.event().amount()))), a.zone(), a.generation(), a.epoch(), a.database()));
         }
         if (groups.isEmpty()) return;
         // IO 开始前核对生命周期，数据库租约原子校验代次；不持有 Region 锁等待事务。
@@ -80,7 +82,7 @@ public final class DailyTaskService implements AutoCloseable {
             var completed = new ArrayList<DailyTask>();
             if (!currentRead(epoch, generation)) return completed;
             for (var o : groups.values()) {
-                var outcome = ledger.record(r, o.actor(), o.relationship(), o.at(), o.definition(), o.event());
+                var outcome = ledger.record(r, o.actor(), o.relationship(), o.at(), o.definition(), o.event(), o.zone());
                 if (outcome.rewarded()) completed.add(outcome.task());
             }
             return completed;
@@ -111,7 +113,8 @@ public final class DailyTaskService implements AutoCloseable {
             var marriage = r.findByPlayer(actor.id());
             RuleViolation.require(marriage != null && marriage.married(), "married-required");
             long now = System.currentTimeMillis();
-            var task = ledger.current(r, marriage, now, settings.tasks().forDay(DailyTaskLedger.daySerial(marriage.marriedAt(), now)));
+            ZoneId zone = taskZone(settings.files().get("config.yml"));
+            var task = ledger.current(r, marriage, now, settings.tasks().forDay(DailyTaskLedger.daySerial(marriage.marriedAt(), now, zone)), zone);
             if (task == null) {
                 config.warn("情侣任务记录校验失败，已保留原始数据；关系编号：" + marriage.id());
                 throw new RuleViolation("task-data-invalid");
@@ -131,5 +134,9 @@ public final class DailyTaskService implements AutoCloseable {
         catch (IllegalStateException unavailable) { return false; }
     }
     public void reload() {readEpoch = UUID.randomUUID(); pending.clear();}
+    private static ZoneId taskZone(org.bukkit.configuration.file.YamlConfiguration config) {
+        try { return ZoneId.of(config.getString("timezone", "Asia/Shanghai")); }
+        catch (RuntimeException invalid) { return ZoneId.of("Asia/Shanghai"); }
+    }
     @Override public void close() {closed = true; readEpoch = UUID.randomUUID(); pending.clear(); timer.cancel();}
 }

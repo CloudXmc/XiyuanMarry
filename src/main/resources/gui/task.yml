@@ -7,7 +7,7 @@
     "DDDDDDDDD",
     "DDDDDDDDD",
     "DDDDDDDDH",
-    "#########"
+    "########R"
   ],
   "icons": {
     "#": {
@@ -45,6 +45,19 @@
         "<gray>每天解锁一个新任务；完成后自动记录羁绊。</gray>"
       ],
       "action": "task-period",
+      "isEnchant": false,
+      "custom-model-data": 0,
+      "hideFlag": true,
+      "hideEnchant": true
+    },
+    "R": {
+      "name": "<gradient:#F5ADCD:#B5A4F0>返回主菜单</gradient>",
+      "material": "OAK_DOOR",
+      "lore": [
+        "<gray>返回结婚系统主菜单。</gray>",
+        "<gradient:#FFE4A3:#F5ADCD>左键点击返回</gradient>"
+      ],
+      "action": "back",
       "isEnchant": false,
       "custom-model-data": 0,
       "hideFlag": true,

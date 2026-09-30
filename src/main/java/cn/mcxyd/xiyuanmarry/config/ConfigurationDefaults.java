@@ -63,9 +63,11 @@ final class ConfigurationDefaults {
                 List.of("DDDDDDDDD","DDDDDDDDD","DDDDDDDDD","DDDDDDDDD","#########"));
         boolean taskPeriodFirst=resource.equals("gui/task.yml")&&current.equals(
                 List.of("DDDHDDDDD","DDDDDDDDD","DDDDDDDDD","DDDDDDDDD","#########"));
+        boolean taskWithoutReturn=resource.equals("gui/task.yml")&&current.equals(
+                List.of("DDDDDDDDD","DDDDDDDDD","DDDDDDDDD","DDDDDDDDH","#########"));
         boolean rankWithoutReturn=resource.equals("gui/rank.yml")&&current.equals(
                 List.of("DDDDDDDDD","DDDDDDDDD","DDDDDDDDD","DDDDDDDDD","#########"));
-        if(!previous.isEmpty()&&(current.equals(previous)||legacyList||mixedList||fullTaskList||taskPeriodFirst||rankWithoutReturn)&&!current.equals(replacement)){
+        if(!previous.isEmpty()&&(current.equals(previous)||legacyList||mixedList||fullTaskList||taskPeriodFirst||taskWithoutReturn||rankWithoutReturn)&&!current.equals(replacement)){
             target.set("layout",replacement);return true;
         }
         return false;

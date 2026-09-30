@@ -53,4 +53,9 @@ class GuiRoutingTest {
         }
         verify(player,never()).performCommand(anyString());
     }
+    @Test void taskBackReturnsToMainMenu(){
+        var task=new XiyuanHolder(UUID.randomUUID(),generation,"task","",0,Map.of());
+        gui.activate(player,task,new XiyuanHolder.Action("back","/mc"));
+        verify(gui).open(player,"main_menu","",0);
+    }
 }

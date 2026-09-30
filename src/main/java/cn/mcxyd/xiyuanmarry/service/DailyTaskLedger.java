@@ -2,6 +2,8 @@ package cn.mcxyd.xiyuanmarry.service;
 import cn.mcxyd.xiyuanmarry.model.*;
 import cn.mcxyd.xiyuanmarry.repository.MarriageRepository;
 import java.util.*;
+import java.time.*;
+import java.time.temporal.ChronoUnit;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
@@ -12,12 +14,27 @@ public final class DailyTaskLedger {
     public static final String BIOME_BUCKET = "daily-task-biomes";
     private record SeenBiomes(long daySerial, Set<String> names) {}
     public record Outcome(DailyTask task, boolean rewarded) {}
+    private static final ZoneId DEFAULT_ZONE = ZoneId.of("Asia/Shanghai");
+    /**
+     * 任务日按结婚当地日期计算：结婚当天为第 0 个序号（界面显示第 1 天），跨自然日才切换。
+     * 这样不会因为结婚时间接近午夜而让“结婚当天”被错误延后到 24 小时后。
+     */
     public static long daySerial(long marriedAt, long now) {
-        return now <= marriedAt ? 0 : (now - marriedAt) / 86_400_000L;
+        return daySerial(marriedAt, now, DEFAULT_ZONE);
+    }
+    public static long daySerial(long marriedAt, long now, ZoneId zone) {
+        Objects.requireNonNull(zone, "zone");
+        if (now < marriedAt) return 0;
+        LocalDate marriedDate = Instant.ofEpochMilli(marriedAt).atZone(zone).toLocalDate();
+        LocalDate currentDate = Instant.ofEpochMilli(now).atZone(zone).toLocalDate();
+        return Math.max(0, ChronoUnit.DAYS.between(marriedDate, currentDate));
     }
     /** 返回 null 表示持久记录不完整；不能把未知完成状态当成新任务覆盖。 */
     public DailyTask current(MarriageRepository repository, MarriageRecord marriage, long now, TaskDefinition definition) {
-        long day = daySerial(marriage.marriedAt(), now);
+        return current(repository, marriage, now, definition, DEFAULT_ZONE);
+    }
+    public DailyTask current(MarriageRepository repository, MarriageRecord marriage, long now, TaskDefinition definition, ZoneId zone) {
+        long day = daySerial(marriage.marriedAt(), now, zone);
         String raw = repository.get(BUCKET, marriage.id());
         DailyTask saved = raw == null ? null : readTask(raw, marriage.id());
         if (raw != null && saved == null) return null;
@@ -31,6 +48,10 @@ public final class DailyTaskLedger {
     }
     public Outcome record(MarriageRepository repository, UUID actor, String relationshipId, long now,
                           TaskDefinition definition, CoupleTaskService.Event event) {
+        return record(repository, actor, relationshipId, now, definition, event, DEFAULT_ZONE);
+    }
+    public Outcome record(MarriageRepository repository, UUID actor, String relationshipId, long now,
+                          TaskDefinition definition, CoupleTaskService.Event event, ZoneId zone) {
         if (repository == null || actor == null || relationshipId == null || definition == null || event == null)
             return new Outcome(null, false);
         return repository.transaction(r -> {
@@ -38,10 +59,10 @@ public final class DailyTaskLedger {
             if (marriage == null || !marriage.married() || !marriage.id().equals(relationshipId)
                     || marriage.state() == MarriageState.DIVORCE_PENDING && marriage.divorceAt() <= now)
                 return new Outcome(null, false);
-            DailyTask before = current(r, marriage, now, definition);
+            DailyTask before = current(r, marriage, now, definition, zone);
             if (before == null) return new Outcome(null, false);
             TaskDefinition assigned = before.definition();
-            if (before.completed() || before.daySerial() != daySerial(marriage.marriedAt(), now) || event.amount() <= 0
+            if (before.completed() || before.daySerial() != daySerial(marriage.marriedAt(), now, zone) || event.amount() <= 0
                     || !assigned.type().equals(event.type())
                     || !assigned.selector().equals("*") && (event.value() == null || !assigned.selector().equalsIgnoreCase(event.value())))
                 return new Outcome(before, false);

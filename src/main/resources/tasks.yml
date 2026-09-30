@@ -1,7 +1,7 @@
 default-trigger-distance: 50
 cycle-days: 30
 # 可选：填写30个任务 id 固定每日顺序；留空则按配置顺序循环。
-# 任务进度按情侣关系和绝对日序保存，跨第三十天不会重复领取同一日奖励。
+# 任务进度按情侣关系和绝对自然日日序保存；结婚当天为第1天，按 config.yml 的 timezone 跨日切换，跨第三十天不会重复领取同一日奖励。
 tasks:
   - {id: kill-monster, type: COMMON_KILL_MONSTER, name: 共同击杀怪物, target: 10}
   - {id: kill-animal, type: COMMON_KILL_ANIMAL, name: 共同击杀动物, target: 10}

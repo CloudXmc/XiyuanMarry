@@ -204,7 +204,7 @@
   "task-entry-name": "第{cycle}轮 · 第{day}天 · {task}",
   "task-period-name": "{year}年{month}月（第{cycle}）",
   "task-period-description": "当前任务周期：{period}",
-  "task-period-cycle": "周期进度：{cycle} · 当前解锁第{day}天",
+  "task-period-cycle": "周期进度：{cycle} · 当前解锁第{day}天（结婚当天算第1天，按服务器时区每日切换）",
   "task-entry-description": "{status} | 今日进度 {progress}/{target} | 完成 +{bond} 羁绊",
   "task-other-description": "{status} | 目标 {target} | 完成 +{bond} 羁绊",
   "rank-select-description": "点击查看榜单；可使用 /marry rank ＜类型＞ 切换榜单",

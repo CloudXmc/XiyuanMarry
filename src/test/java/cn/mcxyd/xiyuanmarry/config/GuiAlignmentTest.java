@@ -46,7 +46,7 @@ class GuiAlignmentTest {
         for(String name:List.of("propose","send_invite","invitation","gift","task","rank")){
             var layout=GuiLayout.parse(read(name));
             if(name.equals("task")){
-                assertEquals(List.of("DDDDDDDDD","DDDDDDDDD","DDDDDDDDD","DDDDDDDDH","#########"),layout.rows(),name);
+                assertEquals(List.of("DDDDDDDDD","DDDDDDDDD","DDDDDDDDD","DDDDDDDDH","########R"),layout.rows(),name);
                 assertEquals(35,layout.dynamicSlots().size());
             }else if(name.equals("rank")){
                 assertEquals(List.of("DDDDDDDDD","DDDDDDDDD","DDDDDDDDD","DDDDDDDDR","#########"),layout.rows(),name);
@@ -62,7 +62,7 @@ class GuiAlignmentTest {
         var actual=read("task");
         actual.set("layout",List.of("DDDHDDDDD","DDDDDDDDD","DDDDDDDDD","DDDDDDDDD","#########"));
         ConfigurationDefaults.merge(actual,read("task"),"gui/task.yml");
-        assertEquals(List.of("DDDDDDDDD","DDDDDDDDD","DDDDDDDDD","DDDDDDDDH","#########"),actual.getStringList("layout"));
+        assertEquals(List.of("DDDDDDDDD","DDDDDDDDD","DDDDDDDDD","DDDDDDDDH","########R"),actual.getStringList("layout"));
     }
     @Test void knownDefaultLayoutsUpgradeWhileCustomLayoutsAndIconsSurvive(){
         var oldList=List.of("DDDDDDDDD","#DDDDDDD#","#DDDDDDD#","#DDDDDDD#","#########");
