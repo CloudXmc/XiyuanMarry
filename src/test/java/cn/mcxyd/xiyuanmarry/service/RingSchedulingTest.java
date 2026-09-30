@@ -36,6 +36,8 @@ class RingSchedulingTest {
     @Test void retiredCallbackReleasesItsSlotForFutureSessions(){rings.start();tick.run();retired.getFirst().run();tick.run();assertEquals(2,queued.size());}
     @Test void callbackUsesCurrentIdentityInsteadOfCapturedIdentity(){
         rings.start();tick.run();when(directory.live(live)).thenReturn(null);
+        // tick 现在会读取婚姻视图以清理偏好；这里只关心回调自身不触碰服务。
+        clearInvocations(marriages);
         var player=mock(Player.class);queued.getFirst().accept(player);
         verify(player,never()).getInventory();verifyNoInteractions(marriages);
     }

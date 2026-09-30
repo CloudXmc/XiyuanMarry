@@ -1,5 +1,5 @@
 name: XiyuanMarry
-version: 2.10.45
+version: 2.10.46
 main: cn.mcxyd.xiyuanmarry.XiyuanMarryPlugin
 api-version: '1.21.11'
 author: xiaota
@@ -26,8 +26,6 @@ permissions:
   marry.admin.force: {description: 强制结婚, default: op}
   marry.admin.divorce: {description: 强制离婚, default: op}
   marry.admin.set: {description: 设置羁绊等级和数值, default: op}
-
-  marry.admin.setexp: {description: 设置羁绊值, default: op}
   marry.admin.give: {description: 发放戒指, default: op}
   marry.admin.list: {description: 查看情侣列表, default: op}
   marry.admin.clear: {description: 清空玩家婚姻数据, default: op}

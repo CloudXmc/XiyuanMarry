@@ -27,6 +27,8 @@ import java.util.concurrent.TimeUnit;
 public final class RingService implements AutoCloseable {
     private static final String ENGAGEMENT = "engagement";
     private static final String MARRIAGE = "marriage";
+    /** 开关偏好按持久身份落库；键为身份 ID，值为 on/off。 */
+    static final String PREF_BUCKET = "ring-prefs";
     private final MarriageService marriages;
     private final ConfigurationManager config;
     private final PlayerDirectory directory;
@@ -52,18 +54,45 @@ public final class RingService implements AutoCloseable {
     public synchronized void start() {
         if(closed||task!=null)return;
         task = scheduler.runRepeatingAsync(this::tick, 1, 2, TimeUnit.SECONDS);
+        loadPreferences();
+    }
+
+    /** 开关偏好按持久身份入库，首次激活时回填内存缓存；损坏键忽略并保持默认开启。 */
+    private void loadPreferences() {
+        if(closed)return;
+        marriages.submit(null, r -> r.entries(PREF_BUCKET), prefs -> {
+            if(closed)return;
+            for(var entry : prefs.entrySet()) try {
+                // putIfAbsent：加载是异步的，玩家在加载完成前的操作必须胜过库里的旧值。
+                enabled.putIfAbsent(UUID.fromString(entry.getKey()), !"off".equals(entry.getValue()));
+            } catch(RuntimeException invalid) {
+                config.warn("戒指开关偏好键无效，已忽略：" + entry.getKey());
+            }
+        }, error -> {}, () -> {});
     }
 
     public boolean toggle(PlayerSnapshot actor) {
         if(closed)return false;
         boolean next = !enabled.getOrDefault(actor.id(), true);
         enabled.put(actor.id(), next);
+        persistPreference(actor.id(), next);
         marriages.notifyLive(actor.liveId(), "ring-toggle", "state", messages.raw(next ? "on" : "off"));
         return next;
     }
 
+    private void persistPreference(UUID identity, boolean on) {
+        marriages.submit(null, r -> {
+            // 重新确认身份仍存在，避免删除资料后的迟到开关重新写回偏好。
+            if(!marriages.view().profiles().containsKey(identity))return null;
+            r.put(PREF_BUCKET, identity.toString(), on ? "on" : "off");
+            return null;
+        }, x -> {}, error -> config.warn("戒指开关偏好写入失败，本次仅内存生效：" + error));
+    }
+
     public void reload() {
+        // 切库或重载后重新读取该库的偏好；内存缓存只保留仍有资料的玩家。
         enabled.keySet().retainAll(marriages.view().profiles().keySet());
+        loadPreferences();
     }
 
     public void give(CommandSender sender, UUID target, String rawType) {
@@ -109,9 +138,9 @@ public final class RingService implements AutoCloseable {
     private void tick() {
         if (closed) return;
         var online=directory.all();
-        var identities=new java.util.HashSet<UUID>();
-        online.forEach(snapshot->identities.add(snapshot.id()));
-        enabled.keySet().retainAll(identities);
+        // 按已知资料而非在线集合清理：退出后偏好必须保留，否则重新登录会静默恢复默认开启。
+        var known=marriages.view();
+        if(known!=null)enabled.keySet().retainAll(known.profiles().keySet());
         for (PlayerSnapshot snapshot : online) {
             UUID live=snapshot.liveId(),token=UUID.randomUUID();
             synchronized(this){
