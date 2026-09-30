@@ -134,9 +134,11 @@ public final class RingService implements AutoCloseable {
         if (closed) return;
         MarriageRecord marriage = marriages.view().byPlayer().get(snapshot.id());
         PlayerSnapshot partner = marriage == null ? null : directory.identity(marriage.partnerOf(snapshot.id()));
+        // 目录快照可能在玩家切换世界或退出时暂时没有坐标；缺少不可变目标坐标时直接跳过本轮。
+        if (marriage == null || partner == null || partner.point() == null || player.getWorld() == null) return;
         ItemStack offhand = player.getInventory().getItemInOffHand();
         String type = ringType(offhand);
-        boolean sameWorld = partner != null && player.getWorld().getUID().equals(partner.point().world());
+        boolean sameWorld = player.getWorld().getUID().equals(partner.point().world());
         double distanceSquared = Double.MAX_VALUE;
         if (sameWorld) {
             var location = player.getLocation();

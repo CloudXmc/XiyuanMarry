@@ -40,7 +40,12 @@ import java.util.function.Function;
  @Override public boolean requestDivorce(UUID id,long at){var m=findByPlayer(id);return m!=null&&update("UPDATE marriages SET state=?,divorce_at=? WHERE relationship_id=? AND state=?","DIVORCE_PENDING",at,m.id(),"MARRIED")==1;}
  @Override public boolean withdrawDivorce(UUID id){var m=findByPlayer(id);return m!=null&&update("UPDATE marriages SET state=?,divorce_at=0 WHERE relationship_id=? AND state=?","MARRIED",m.id(),"DIVORCE_PENDING")==1;}
  @Override public boolean deleteMarriage(UUID id){return transaction(r->{var m=findByPlayer(id);if(m==null)return false;put("history",m.id(),new com.google.gson.Gson().toJson(m));update("DELETE FROM xym_members WHERE relationship_id=?",m.id());return update("DELETE FROM marriages WHERE relationship_id=?",m.id())==1;});}
- @Override public boolean addBond(UUID id,long amount){if(amount<=0)return false;var m=findByPlayer(id);return m!=null&&m.married()&&update("UPDATE marriages SET bond=bond+?,total_bond=total_bond+? WHERE relationship_id=?",amount,amount,m.id())==1;}
+ @Override public boolean addBond(UUID id,long amount){
+  if(id==null||amount<=0)return false;var m=findByPlayer(id);if(m==null||!m.married())return false;
+  // 两个计数必须在同一条写入中通过上界校验；拒绝溢出而不截断，调用方才能回滚任务进度。
+  long limit=Long.MAX_VALUE-amount;
+  return update("UPDATE marriages SET bond=bond+?,total_bond=total_bond+? WHERE relationship_id=? AND state IN ('MARRIED','DIVORCE_PENDING') AND bond>=0 AND total_bond>=0 AND bond<=? AND total_bond<=?",amount,amount,m.id(),limit,limit)==1;
+ }
  @Override public boolean setBond(UUID id,long amount){if(amount<0)return false;var m=findByPlayer(id);return m!=null&&update("UPDATE marriages SET bond=? WHERE relationship_id=?",amount,m.id())==1;}
  @Override public boolean addOnline(UUID id,long seconds){if(seconds<1)return false;var m=findByPlayer(id);return m!=null&&m.married()&&update("UPDATE marriages SET shared_seconds=shared_seconds+? WHERE relationship_id=?",seconds,m.id())==1;}
  @Override public int expireEngagements(long cutoff){return transaction(r->{int n=0;for(var m:findAll())if(m.state()==MarriageState.ENGAGED&&m.createdAt()<=cutoff){deleteMarriage(m.playerOne());n++;}return n;});}

@@ -37,7 +37,11 @@ final class WeeklyRewardLedger {
             throw new IllegalArgumentException("周榜奖励名次范围为 1-1000");
         return repository.transaction(r -> {
             String raw = r.get(CURSORS, board);
-            Cursor cursor = raw == null ? null : gson.fromJson(raw, Cursor.class);
+            Cursor cursor;
+            try { cursor = raw == null ? null : gson.fromJson(raw, Cursor.class); }
+            catch (RuntimeException invalid) { return none(board, now); }
+            if (raw != null && (cursor == null || cursor.schedule() == null || cursor.lastWeek() == null || cursor.nextAt() < 0))
+                return none(board, now);
             if (cursor == null || !schedule.signature().equals(cursor.schedule())) {
                 cursor = new Cursor(schedule.signature(), schedule.nextOrSame(Instant.ofEpochMilli(Math.min(now, activatedAt))).toInstant().toEpochMilli(),
                         cursor == null ? "" : cursor.lastWeek());
@@ -90,7 +94,10 @@ final class WeeklyRewardLedger {
     private void prune(MarriageRepository r, long now) {
         long cutoff = now - Duration.ofDays(120).toMillis();
         for (var entry : r.entries(SETTLEMENTS).entrySet()) {
-            Settlement historical = gson.fromJson(entry.getValue(), Settlement.class);
+            Settlement historical;
+            try { historical = gson.fromJson(entry.getValue(), Settlement.class); }
+            catch (RuntimeException invalid) { continue; }
+            if (historical == null || historical.created() < 0) continue;
             if (historical.created() < cutoff) {
                 String prefix = entry.getKey() + ":";
                 for (String key : r.entries(WINNERS).keySet()) if (key.startsWith(prefix)) r.remove(WINNERS, key);

@@ -100,4 +100,26 @@ class RewardClaimLedgerTest {
             assertThrows(RuleViolation.class, () -> new RewardClaimLedger(db).reserve(t.recipient(), t.id(), 3));
         }
     }
+    @Test void malformedTicketIsTreatedAsUnavailable() {
+        try (var db = new DatabaseManager(DatabaseSettings.sqlite(root.resolve("malformed.db")))) {
+            UUID id=UUID.randomUUID(), recipient=UUID.randomUUID();
+            db.use(r -> { r.put(RewardClaimLedger.INBOX,id.toString(),"not-json"); return null; });
+            assertDoesNotThrow(() -> assertNull(new RewardClaimLedger(db).reserve(recipient,id,3)));
+        }
+    }
+    @Test void embeddedIdCannotReserveOrOverwriteAnotherStorageKey() {
+        try(var db=new DatabaseManager(DatabaseSettings.sqlite(root.resolve("key-mismatch.db")))){
+            var ticket=ticket();UUID alias=UUID.randomUUID();String raw=gson.toJson(ticket);save(db,ticket);
+            db.use(r->{r.put(RewardClaimLedger.INBOX,alias.toString(),raw);return null;});
+            var ledger=new RewardClaimLedger(db);
+            assertNull(ledger.reserve(ticket.recipient(),alias,2));
+            assertEquals(raw,db.<String>use(r->r.get(RewardClaimLedger.INBOX,alias.toString())));
+            assertEquals(raw,db.<String>use(r->r.get(RewardClaimLedger.INBOX,ticket.id().toString())));
+            assertTrue(db.<Boolean>use(r->r.entries(RewardClaimLedger.TOKENS).isEmpty()));
+            var valid=ledger.reserve(ticket.recipient(),ticket.id(),3);assertNotNull(valid);
+            assertTrue(ledger.complete(valid,4));
+            assertNull(ledger.reserve(ticket.recipient(),alias,5),"正常票据领取后别名不能再次发放同份奖励");
+            assertEquals(raw,db.<String>use(r->r.get(RewardClaimLedger.INBOX,alias.toString())));
+        }
+    }
 }

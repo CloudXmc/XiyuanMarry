@@ -35,4 +35,22 @@ class GuiRoutingTest {
         gui.activate(player,holder,new XiyuanHolder.Action("invitations",""));
         verify(gui).open(player,"send_invite","",0);
     }
+    @Test void weddingPreparationPointButtonsUseTheValidatedCommandPath(){
+        var commands=new ArrayList<List<String>>();
+        gui.commands((ignored,args)->commands.add(List.of(args)));
+        var wedding=new XiyuanHolder(UUID.randomUUID(),generation,"wedding_plan","",0,Map.of());
+        gui.activate(player,wedding,new XiyuanHolder.Action("set-wedding-nx",""));
+        gui.activate(player,wedding,new XiyuanHolder.Action("set-wedding-nl",""));
+        gui.activate(player,wedding,new XiyuanHolder.Action("set-wedding-ly",""));
+        org.junit.jupiter.api.Assertions.assertEquals(List.of(List.of("hunliset","nx"),List.of("hunliset","nl"),List.of("hunliset","ly")),commands);
+    }
+    @Test void rankBackReturnsToMainMenuFromSelectionAndFromBoard(){
+        for(String mode:List.of("","bond","duration","online","total")){
+            clearInvocations(gui);
+            var rank=new XiyuanHolder(UUID.randomUUID(),generation,"rank",mode,0,Map.of());
+            gui.activate(player,rank,new XiyuanHolder.Action("back","/mc"));
+            verify(gui).open(player,"main_menu","",0);
+        }
+        verify(player,never()).performCommand(anyString());
+    }
 }

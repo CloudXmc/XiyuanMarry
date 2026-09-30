@@ -4,9 +4,9 @@
   "title": "<gradient:#F5ADCD:#B5A4F0>发送请帖</gradient>",
   "layout": [
     "DDDDDDDDD",
-    "#DDDDDDD#",
-    "#DDDDDDD#",
-    "#DDDDDDD#",
+    "DDDDDDDDD",
+    "DDDDDDDDD",
+    "DDDDDDDDD",
     "#########"
   ],
   "icons": {

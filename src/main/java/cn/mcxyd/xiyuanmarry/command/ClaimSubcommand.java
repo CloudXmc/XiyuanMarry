@@ -24,11 +24,18 @@ public final class ClaimSubcommand implements Subcommand {
     public List<String> complete(CommandSender sender, String[] args) { return List.of(); }
     public void execute(CommandSender sender, String label, String[] args) {
         if (args.length > 1) { messages.send(sender, "invalid-argument"); return; }
-        if (args.length == 0) { inbox.list(players.capture((Player) sender)); return; }
+        if (args.length == 0) {
+            var actor = players.capture((Player) sender);
+            if (actor == null) { messages.send(sender, "offline"); return; }
+            inbox.list(actor);
+            return;
+        }
         UUID id;
         try { id = UUID.fromString(args[0]); }
         catch (IllegalArgumentException invalid) { messages.send(sender, "invalid-argument"); return; }
         var actor = players.capture((Player) sender);
+        // 玩家对象仍在线但身份快照可能在 reload/退出边界失效；不得把空快照送进领取状态机。
+        if (actor == null) { messages.send(sender, "offline"); return; }
         rewards.claim(actor, id, handled -> { if (!handled) gifts.claim(actor, id); });
     }
 }

@@ -17,6 +17,7 @@ public final class AcceptSubcommand implements Subcommand {
     public void execute(CommandSender sender,String label,String[] args){
         var target=RequestTarget.parse(args);
         var player=directory.capture((Player)sender);
+        RuleViolation.require(player!=null,"database-not-ready");
         if(target==RequestTarget.INVITATION)weddings.respond(player,true);else marriages.accept(player);
     }
     public List<String> complete(CommandSender sender,String[] args){return args.length==1?List.of("proposal","invitation"):List.of();}

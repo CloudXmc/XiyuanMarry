@@ -166,7 +166,11 @@ public final class BondAttributeService implements AutoCloseable {
         if (timer != null) timer.cancel();
         // 关闭后只提交属性清理；真实停服可能拒绝或取消实体调度，不能承诺必定执行。
         for (var snapshot : marriages.directory().all()) {
-            scheduler.player(snapshot.liveId(), this::remove, () -> {});
+            try {
+                scheduler.player(snapshot.liveId(), this::remove, () -> {});
+            } catch (RuntimeException ignored) {
+                // Paper 在插件已进入 disabled 状态时会拒绝注册实体任务；停服无需再写回实时属性。
+            }
         }
         pending.clear();
         applied.clear();

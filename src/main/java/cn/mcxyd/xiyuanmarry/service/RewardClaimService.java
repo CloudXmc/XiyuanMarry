@@ -60,6 +60,10 @@ final class RewardClaimService implements AutoCloseable {
         });
     }
     void claim(PlayerSnapshot actor, UUID id, Consumer<Boolean> next) {
+        if (actor == null || id == null) {
+            if (next != null) next.accept(true);
+            return;
+        }
         Operation operation;
         synchronized (pending) {
             if (closed) { next.accept(true); return; }
@@ -108,8 +112,12 @@ final class RewardClaimService implements AutoCloseable {
             finish(operation, Outcome.RETRY, "reward-economy-unavailable"); return;
         }
         scheduler.player(operation.actor.liveId(), player -> {
-            if (!current(operation) || player.isDead()
-                    || !marriages.directory().capture(player).id().equals(operation.actor.id())) {
+            if (!current(operation) || player.isDead()) {
+                finish(operation, Outcome.RETRY, "reward-claim-cancelled"); return;
+            }
+            var identity = marriages.directory().capture(player);
+            if (!current(operation) || player.isDead() || identity == null
+                    || !identity.id().equals(operation.actor.id())) {
                 finish(operation, Outcome.RETRY, "reward-claim-cancelled"); return;
             }
             if (!operation.attempt.startEffects()) return;

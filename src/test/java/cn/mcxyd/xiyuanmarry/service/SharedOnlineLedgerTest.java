@@ -40,4 +40,14 @@ class SharedOnlineLedgerTest {
             assertEquals(0,r.findByPlayer(a).sharedSeconds());assertEquals(0,r.findByPlayer(a).bond());
         }
     }
+    @Test void malformedOnlineLedgerDoesNotAwardOrThrow(){
+        UUID a=UUID.randomUUID(),b=UUID.randomUUID();var ledger=new SharedOnlineLedger();
+        try(var r=new SqliteMarriageRepository(dir.resolve("malformed-online.db"))){
+            r.createMarriage(a,b,"NORMAL",1000);var id=r.findByPlayer(a).id();
+            r.put("shared-online",id,"not-json");
+            var result=assertDoesNotThrow(() -> ledger.record(r,a,id,1000,1001,"2026-09-26",10,8));
+            assertEquals(0,result.seconds());assertEquals(0,result.bond());
+            assertEquals(0,r.findByPlayer(a).sharedSeconds());
+        }
+    }
 }

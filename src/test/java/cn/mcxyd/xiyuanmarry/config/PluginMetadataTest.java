@@ -13,13 +13,17 @@ class PluginMetadataTest {
         YamlConfiguration descriptor = YamlConfiguration.loadConfiguration(
                 new File("src/main/resources/plugin.yml"));
 
-        assertEquals("2.10.0", descriptor.getString("version"));
+        assertEquals("2.10.43", descriptor.getString("version"));
         assertEquals("cn.mcxyd.xiyuanmarry.XiyuanMarryPlugin", descriptor.getString("main"));
         assertEquals("xiaota", descriptor.getString("author"));
         assertTrue(descriptor.getBoolean("folia-supported"));
         assertTrue(descriptor.getStringList("softdepend").contains("PlaceholderAPI"));
     }
 }
+
+
+
+
 
 
 

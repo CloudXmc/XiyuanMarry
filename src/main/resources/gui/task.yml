@@ -4,9 +4,9 @@
   "title": "<gradient:#F5ADCD:#B5A4F0>情侣任务</gradient>",
   "layout": [
     "DDDDDDDDD",
-    "#DDDDDDD#",
-    "#DDDDDDD#",
-    "#DDDDDDD#",
+    "DDDDDDDDD",
+    "DDDDDDDDD",
+    "DDDDDDDDH",
     "#########"
   ],
   "icons": {
@@ -31,6 +31,20 @@
         "<gray>完成自动入账；离线不补发未记录的行为</gray>"
       ],
       "action": "select",
+      "isEnchant": false,
+      "custom-model-data": 0,
+      "hideFlag": true,
+      "hideEnchant": true
+    },
+    "H": {
+      "name": "<gradient:#F5ADCD:#B5A4F0>{task.period}</gradient>",
+      "material": "CLOCK",
+      "lore": [
+        "<gray>{task.description}</gray>",
+        "<yellow>{task.cycle}</yellow>",
+        "<gray>每天解锁一个新任务；完成后自动记录羁绊。</gray>"
+      ],
+      "action": "task-period",
       "isEnchant": false,
       "custom-model-data": 0,
       "hideFlag": true,

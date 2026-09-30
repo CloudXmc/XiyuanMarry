@@ -12,4 +12,12 @@ class GuiRequestTrackerTest {
         var old=tracker.begin(player,0);assertFalse(tracker.consume(player,old,10000));
         var reload=tracker.begin(player,10001);tracker.clear();assertFalse(tracker.consume(player,reload,10002));
     }
+    @Test void beginIfAbsentDebouncesDuplicateReads() {
+        var tracker=new GuiRequestTracker();var player=UUID.randomUUID();
+        var first=tracker.beginIfAbsent(player,0);
+        assertNotNull(first);
+        assertNull(tracker.beginIfAbsent(player,1));
+        assertTrue(tracker.consume(player,first,2));
+        assertNotNull(tracker.beginIfAbsent(player,3));
+    }
 }

@@ -49,4 +49,10 @@ class CommandHelpCoverageTest {
         root.onCommand(player,null,"marry",new String[]{"menu","normal","Alice"});
         verify(gui).openFiltered(player,"propose","NORMAL","Alice");
     }
+    @Test void normalProposalRejectsSurplusArgumentsBeforeLookingUpPlayers(){
+        var player=mock(Player.class);when(player.hasPermission(anyString())).thenReturn(true);
+        root.onCommand(player,null,"marry",new String[]{"normal","Bob","extra"});
+        verify(messages).send(player,"invalid-argument");
+        verifyNoInteractions(players,marriages,gui);
+    }
 }

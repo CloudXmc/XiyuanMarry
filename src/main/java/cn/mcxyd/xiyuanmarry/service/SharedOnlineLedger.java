@@ -18,7 +18,10 @@ public final class SharedOnlineLedger {
             if(marriage==null||!marriage.married()||!marriage.id().equals(relation)
                 ||marriage.state()==MarriageState.DIVORCE_PENDING&&marriage.divorceAt()<=end*1000)return new Award(0,0);
             String raw=tx.get("shared-online",relation);
-            State state=raw==null?new State(0,""):gson.fromJson(raw,State.class);
+            State state;
+            try { state=raw==null?new State(0,""):gson.fromJson(raw,State.class); }
+            catch (RuntimeException invalid) { return new Award(0,0); }
+            if(state==null||state.lastEnd()<0||state.awardedDate()==null) return new Award(0,0);
             long effectiveStart=Math.max(Math.max(start,state.lastEnd()),(marriage.marriedAt()+999)/1000);
             long seconds=Math.max(0,end-effectiveStart);
             if(seconds==0)return new Award(0,0);

@@ -5,6 +5,11 @@ public final class TeleportSubcommand implements Subcommand {
     private final PartnerTeleportService service;private final PlayerDirectory players;private final MessageService messages;
     public TeleportSubcommand(PartnerTeleportService s,PlayerDirectory p,MessageService m){service=s;players=p;messages=m;}
     public String name(){return "tp";}public List<String> aliases(){return List.of();}public String permission(){return "marry.use";}public boolean playerOnly(){return true;}
-    public void execute(CommandSender sender,String label,String[] args){if(args.length!=0){messages.send(sender,"invalid-argument");return;}service.teleport(players.capture((Player)sender));}
+    public void execute(CommandSender sender,String label,String[] args){
+        if(args.length!=0){messages.send(sender,"invalid-argument");return;}
+        var actor=players.capture((Player)sender);
+        if(actor==null){messages.send(sender,"database-not-ready");return;}
+        service.teleport(actor);
+    }
     public List<String> complete(CommandSender sender,String[] args){return List.of();}
 }

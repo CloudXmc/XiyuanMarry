@@ -33,7 +33,9 @@ public final class GuiFactory implements AutoCloseable {
     }
     public void openFiltered(Player player,String page,String mode,String filter){
         if(!player.hasPermission("marry.use")){messages.send(player,"no-permission");return;}
-        if(closed)return;requests.cancel(player.getUniqueId());
+        if(closed)return;
+        // 任务读取需要保留现有令牌，由 beginIfAbsent 防止重复点击；其余菜单仍可替换旧查询。
+        if(!page.equals("task")) requests.cancel(player.getUniqueId());
         var actor=marriages.directory().capture(player);var snapshot=config.snapshot();
         if(actor==null||player.isDead())return;
         UUID databaseGeneration=marriages.databaseGeneration();
@@ -43,38 +45,86 @@ public final class GuiFactory implements AutoCloseable {
             if(token==null){messages.send(player,"busy");return;}
             messages.send(player,"menu-loading");
             if(page.equals("gift"))inbox.load(actor,(owner,notices)->
-                completeOpen(owner,actor,snapshot.generation(),databaseGeneration,token,page,mode,filter,content.inbox(notices)));
+                completeOpen(owner,actor,snapshot.generation(),databaseGeneration,token,page,mode,filter,content.inbox(notices)),
+                error->failOpen(actor,snapshot.generation(),token,error));
             else marriages.submitAtGeneration(actor.liveId(),databaseGeneration,
                 repository->wedding.pendingInvitations(repository,actor.id()),
                 list->scheduler.player(actor.liveId(),owner->completeOpen(owner,actor,snapshot.generation(),
-                    databaseGeneration,token,page,mode,filter,content.invitations(list))),error->{});
+                    databaseGeneration,token,page,mode,filter,content.invitations(list))),
+                error->failOpen(actor,snapshot.generation(),token,error));
             return;
         }
         if(page.equals("task")){
-            UUID token=requests.begin(actor.liveId(),System.currentTimeMillis());
-            if(token==null){messages.send(player,"busy");return;}
+            UUID token=requests.beginIfAbsent(actor.liveId(),System.currentTimeMillis());
+            if(token==null){messages.send(player,"task-refresh-busy");return;}
             messages.send(player,"task-loading");
-            tasks.load(actor,task->scheduler.player(actor.liveId(),owner->{
-                if(closed||!snapshot.generation().equals(config.snapshot().generation())
-                    ||!requests.consume(actor.liveId(),token,System.currentTimeMillis()))return;
-                var current=marriages.view().byPlayer().get(actor.id());
-                if(current==null||!current.id().equals(task.coupleId())||!current.married())return;
-                render(owner,page,mode,0,content.tasks(task));
-            }));
+            tasks.load(actor,task->scheduler.player(actor.liveId(),owner->completeTaskOpen(owner,actor,snapshot.generation(),databaseGeneration,token,page,mode,task),
+                ()->requests.consume(actor.liveId(),token,System.currentTimeMillis())),
+                error->failOpen(actor,snapshot.generation(),token,error,"task-load-failed"));
             return;
         }
         render(player,page,mode,0,MenuContentProvider.filter(content.entries(actor,page,mode),filter));
     }
+    private void completeTaskOpen(Player owner,PlayerSnapshot actor,UUID configGeneration,UUID databaseGeneration,
+                                  UUID token,String page,String mode,DailyTask task){
+        if(!finishOpen(owner,actor,configGeneration,databaseGeneration,token))return;
+        var current=marriages.view().byPlayer().get(actor.id());
+        if(current==null||!current.id().equals(task.coupleId())||!current.married()){
+            messages.send(owner,"married-required");return;
+        }
+        messages.send(owner,"task-loaded","task",task.definition().name(),"progress",task.progress(),"target",task.definition().target());
+        render(owner,page,mode,0,content.tasks(task),content.taskPeriodTokens(task,
+            java.time.LocalDate.now(java.time.ZoneId.of(config.config().getString("timezone","Asia/Shanghai")))));
+    }
+    private boolean containsRuleViolation(Throwable error){
+        for(Throwable current=error;current!=null;current=current.getCause())
+            if(current instanceof RuleViolation)return true;
+        return false;
+    }
+    private boolean isBusyFailure(Throwable error){
+        for(Throwable current=error;current!=null;current=current.getCause())
+            if(current instanceof IllegalStateException && ("操作繁忙".equals(current.getMessage())||"IO队列已满".equals(current.getMessage())
+                ||"数据库尚未初始化".equals(current.getMessage())))return true;
+        return false;
+    }
+    private void failOpen(PlayerSnapshot actor,UUID configGeneration,UUID token,Throwable error){
+        failOpen(actor,configGeneration,token,error,"menu-load-failed");
+    }
+    private void failOpen(PlayerSnapshot actor,UUID configGeneration,UUID token,Throwable error,String message){
+        if(closed){requests.consume(actor.liveId(),token,System.currentTimeMillis());return;}
+        try {
+            scheduler.player(actor.liveId(),owner->{
+                // 只结束匹配令牌，旧失败回调不能取消玩家刚打开的新菜单。
+                if(!requests.consume(actor.liveId(),token,System.currentTimeMillis())
+                    ||closed||!configGeneration.equals(config.snapshot().generation()))return;
+                var live=marriages.directory().live(actor.liveId());
+                if(live==null||!live.id().equals(actor.id())||!live.identityKey().equals(actor.identityKey())
+                    ||owner.isDead()||!owner.hasPermission("marry.use"))return;
+                if(!containsRuleViolation(error)&&!isBusyFailure(error))messages.send(owner,message);
+            },()->requests.consume(actor.liveId(),token,System.currentTimeMillis()));
+        } catch(RuntimeException rejected) {
+            requests.consume(actor.liveId(),token,System.currentTimeMillis());
+            config.warn("菜单失败通知无法调度："+rejected);
+        }
+    }
     private void completeOpen(Player owner,PlayerSnapshot actor,UUID configGeneration,UUID databaseGeneration,
             UUID token,String page,String mode,String filter,List<MenuContentProvider.Entry> entries){
-        if(closed||!configGeneration.equals(config.snapshot().generation())
-                ||!databaseGeneration.equals(marriages.databaseGeneration())||owner.isDead()||!owner.hasPermission("marry.use"))return;
-        var current=marriages.directory().live(actor.liveId());
-        if(current==null||!current.id().equals(actor.id())||!current.identityKey().equals(actor.identityKey())
-                ||!requests.consume(actor.liveId(),token,System.currentTimeMillis()))return;
+        if(!finishOpen(owner,actor,configGeneration,databaseGeneration,token))return;
         render(owner,page,mode,0,MenuContentProvider.filter(entries,filter));
     }
+    /** 所有异步菜单读取统一在实体上下文结束令牌并重新验证展示资格。 */
+    private boolean finishOpen(Player owner,PlayerSnapshot actor,UUID configGeneration,UUID databaseGeneration,UUID token){
+        // 成功结果失效时也必须结束自己的请求，不能遗留读取锁。
+        if(!requests.consume(actor.liveId(),token,System.currentTimeMillis())
+                ||closed||!configGeneration.equals(config.snapshot().generation())
+                ||!databaseGeneration.equals(marriages.databaseGeneration())||owner.isDead()||!owner.hasPermission("marry.use"))return false;
+        var current=marriages.directory().live(actor.liveId());
+        return current!=null&&current.id().equals(actor.id())&&current.identityKey().equals(actor.identityKey());
+    }
     void render(Player player,String page,String mode,int index,List<MenuContentProvider.Entry> entries){
+        render(player,page,mode,index,entries,new Object[0]);
+    }
+    private void render(Player player,String page,String mode,int index,List<MenuContentProvider.Entry> entries,Object[] fixedValues){
         var snapshot=config.snapshot();var layout=snapshot.menus().get(page);
         if(layout==null){messages.send(player,"invalid-argument");return;}
         var slots=layout.dynamicSlots();int capacity=Math.max(1,slots.size());
@@ -84,7 +134,7 @@ public final class GuiFactory implements AutoCloseable {
         var items=new HashMap<Integer,org.bukkit.inventory.ItemStack>();
         for(int i=0;i<layout.size();i++){
             char ch=layout.rows().get(i/9).charAt(i%9);if(ch=='A'||ch=='D')continue;
-            var icon=layout.icons().get(ch);items.put(i,icons.create(icon));
+            var icon=layout.icons().get(ch);items.put(i,icons.create(icon,ch=='H'?fixedValues:new Object[0]));
             if(!icon.action().isEmpty())actions.put(i,new XiyuanHolder.Action(icon.action(),icon.returnCommand()));
         }
         for(int j=0;j<slots.size();j++){
@@ -97,7 +147,10 @@ public final class GuiFactory implements AutoCloseable {
         var inventory=Bukkit.createInventory(holder,layout.size(),messages.renderer().gui(messages.parse(layout.title())));
         holder.attach(inventory);items.forEach(inventory::setItem);player.openInventory(inventory);playSound(player, layout, layout.sounds().open());
         if(entries.isEmpty()&&!slots.isEmpty())messages.send(player,"empty");
-        if(entries.size()>slots.size())messages.send(player,"menu-overflow","shown",slots.size(),"total",entries.size(),"page",page.equals("propose")&&mode.equals("NORMAL")?"normal":page);
+        if(entries.size()>slots.size()){
+            if(page.equals("task"))messages.send(player,"task-menu-overflow","shown",slots.size(),"total",entries.size());
+            else messages.send(player,"menu-overflow","shown",slots.size(),"total",entries.size(),"page",page.equals("propose")&&mode.equals("NORMAL")?"normal":page);
+        }
     }
     public void playClick(Player player, XiyuanHolder holder) { var layout=config.snapshot().menus().get(holder.page()); if(layout!=null) playSound(player,layout,layout.sounds().click()); }
     public void playClose(Player player, String page) { var layout=config.snapshot().menus().get(page); if(layout!=null) playSound(player,layout,layout.sounds().close()); }
@@ -110,6 +163,7 @@ public final class GuiFactory implements AutoCloseable {
         if(!player.hasPermission("marry.use")){messages.send(player,"no-permission");return;}
         if(!holder.generation().equals(config.snapshot().generation())){open(player,holder.page(),holder.mode(),holder.index());return;}
         switch(action.key()){
+            case "back" -> open(player,"main_menu","",0);
             case "normal-marriage" -> open(player,"propose","NORMAL",0);
             case "wedding-marriage" -> open(player,"propose","WEDDING",0);
             case "wedding-plan" -> open(player,"wedding_plan","",0);
@@ -122,8 +176,12 @@ public final class GuiFactory implements AutoCloseable {
                 else command.accept(player,new String[]{"info"});
             }
             case "task","tp","cancel" -> command.accept(player,new String[]{action.key()});
+            case "task-period" -> { }
             case "gifts" -> open(player,"gift","",0);
             case "set-wedding-location" -> command.accept(player,new String[]{"setweddingloc"});
+            case "set-wedding-nx" -> command.accept(player,new String[]{"hunliset","nx"});
+            case "set-wedding-nl" -> command.accept(player,new String[]{"hunliset","nl"});
+            case "set-wedding-ly" -> command.accept(player,new String[]{"hunliset","ly"});
             case "start-wedding" -> command.accept(player,new String[]{"startw"});
             case "select" -> select(player,holder,action.value(),alternate);
             default -> config.warn("忽略未注册的GUI动作："+action.key());
@@ -136,20 +194,27 @@ public final class GuiFactory implements AutoCloseable {
         }
         if(holder.page().equals("invitation")){
             var actor=marriages.directory().capture(player);
-            if(actor!=null){player.closeInventory();wedding.respond(actor,value,!alternate);}return;
+            if(actor!=null){player.closeInventory();wedding.respond(actor,value,!alternate);} else messages.send(player,"database-not-ready");
+            return;
         }
         if(holder.page().equals("task")){open(player,"task","",holder.index());return;}
-        if(holder.page().equals("partner_info")){marriages.info(player,UUID.fromString(value));return;}
+        if(holder.page().equals("partner_info")){UUID id=parseUuid(player,value);if(id!=null)marriages.info(player,id);return;}
         if(holder.page().equals("rank")){
             if(holder.mode().isBlank())open(player,"rank",value,0);
-            else marriages.info(player,UUID.fromString(value));
+            else {UUID id=parseUuid(player,value);if(id!=null)marriages.info(player,id);}
             return;
         }
         if(holder.page().equals("propose")||holder.page().equals("send_invite")){
-            var target=marriages.directory().live(UUID.fromString(value));
+            UUID id=parseUuid(player,value);if(id==null)return;
+            var target=marriages.directory().live(id);
             if(target==null){messages.send(player,"offline");return;}
             var actor=marriages.directory().capture(player);
+            if(actor==null){messages.send(player,"database-not-ready");return;}
             if(holder.page().equals("propose"))marriages.propose(actor,target,holder.mode());else wedding.invite(actor,target);
         }
+    }
+    private UUID parseUuid(Player player,String value) {
+        try { return UUID.fromString(value); }
+        catch (IllegalArgumentException invalid) { messages.send(player,"invalid-argument"); return null; }
     }
 }

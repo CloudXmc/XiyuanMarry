@@ -1,7 +1,7 @@
 package cn.mcxyd.xiyuanmarry.service;
 import cn.mcxyd.xiyuanmarry.config.ConfigurationManager;
 import cn.mcxyd.xiyuanmarry.message.MessageService;
-import cn.mcxyd.xiyuanmarry.model.PlayerSnapshot;
+import cn.mcxyd.xiyuanmarry.model.*;
 import cn.mcxyd.xiyuanmarry.scheduler.*;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -38,5 +38,15 @@ class RingSchedulingTest {
         rings.start();tick.run();when(directory.live(live)).thenReturn(null);
         var player=mock(Player.class);queued.getFirst().accept(player);
         verify(player,never()).getInventory();verifyNoInteractions(marriages);
+    }
+    @Test void missingPartnerPointSkipsEntityInventorySafely(){
+        UUID partnerId=UUID.randomUUID();
+        var marriage=new MarriageRecord(live,partnerId,MarriageState.MARRIED,"NORMAL",1,0,0,"pair",1,0,0);
+        when(marriages.view()).thenReturn(new MarriageService.View(Map.of(live,marriage,partnerId,marriage),Map.of(),List.of(marriage),Map.of()));
+        when(directory.identity(partnerId)).thenReturn(new PlayerSnapshot(partnerId,partnerId,"guest:partner","Partner",60,null,1));
+        rings.start();tick.run();
+        var player=mock(Player.class);when(player.isOnline()).thenReturn(true);when(player.isDead()).thenReturn(false);
+        assertDoesNotThrow(()->queued.getFirst().accept(player));
+        verify(player,never()).getInventory();
     }
 }

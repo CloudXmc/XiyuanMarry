@@ -9,14 +9,22 @@ final class ConfigurationDefaults {
         changed |= upgradeKnownDefaults(target, resource);
         changed |= upgradeGuiTo45Slots(target, resource);
         changed |= upgradeInboxMenus(target,defaults,resource);
+        changed |= upgradeAlignedMenus(target,defaults,resource);
+        if(resource.equals("messages.yml")&&defaults.contains("teleport-cooldown")
+                &&"<yellow>传送冷却中，请稍后再试。</yellow>".equals(target.getString("teleport-cooldown"))){
+            target.set("teleport-cooldown",defaults.getString("teleport-cooldown"));changed=true;
+        }
         // 已存在的奖励目录属于服主定义；空目录和删除名次都不是缺失配置。
         var protectedRoots = resource.equals("rewards.yml")
                 ? List.of("anniversaries", "level-up", "weekly-top.rewards").stream().filter(target::contains).toList()
                 : List.<String>of();
         for (String key : defaults.getKeys(true)) {
             if (!target.contains(key) && protectedRoots.stream().anyMatch(root -> key.startsWith(root + "."))) continue;
-            if (!target.contains(key) && !defaults.isConfigurationSection(key)) {
-                target.set(key, defaults.get(key)); changed = true;
+            if (!target.contains(key)) {
+                // 先创建新节，避免对子节点补全前写入的节注释被 Bukkit 丢弃。
+                if (defaults.isConfigurationSection(key)) target.createSection(key);
+                else target.set(key, defaults.get(key));
+                changed = true;
             }
             if (target.getComments(key).isEmpty()) {
                 var comments = defaults.getComments(key);
@@ -25,6 +33,42 @@ final class ConfigurationDefaults {
             }
         }
         return changed;
+    }
+
+    private static boolean upgradeAlignedMenus(YamlConfiguration target,YamlConfiguration defaults,String resource){
+        if(!resource.startsWith("gui/")||defaults.getStringList("layout").isEmpty())return false;
+        // 服主预留的同名图标不能因升级布局而被意外激活。
+        if(resource.equals("gui/rank.yml")&&target.contains("icons.R")){
+            var existing=target.getConfigurationSection("icons.R");
+            var expected=defaults.getConfigurationSection("icons.R");
+            if(existing==null||expected==null||!existing.getValues(true).equals(expected.getValues(true)))return false;
+        }
+        var previous=switch(resource){
+            case "gui/main_menu.yml"->List.of("#########","#IATARAB#","#ACQAAWA#","#AAGAUAA#","#########");
+            case "gui/wedding_plan.yml"->List.of("#########","#LAIAGAA#","#AAASACA#","#AAAAAAA#","#########");
+            case "gui/propose.yml","gui/send_invite.yml","gui/invitation.yml","gui/gift.yml","gui/rank.yml","gui/partner_info.yml"
+                    ->List.of("DDDDDDDDD","#DDDDDDD#","#DDDDDDD#","#DDDDDDD#","#########");
+            case "gui/task.yml"->List.of("DDDDDDDDD","DDDDDDDDD","DDDDDDDDD","DDDDDDDDD","#########");
+            default->List.<String>of();
+        };
+        // 只迁移已发布的默认排列；不改图标、动作、标题和服主自定义布局。
+        var replacement=defaults.getStringList("layout");
+        var current=target.getStringList("layout");
+        // 2.8.3 的导航栏被旧迁移移除后只剩 21 个 D，仍需继续升级到当前列表布局。
+        boolean legacyList=previous.contains("DDDDDDDDD")&&current.equals(
+                List.of("#########","#DDDDDDD#","#DDDDDDD#","#DDDDDDD#","#########"));
+        boolean mixedList=previous.contains("DDDDDDDDD")&&current.equals(
+                List.of("DDDDDDDDD","#DDDDDDD#","#DDDDDDD#","#DDDDDDD#","#########"));
+        boolean fullTaskList=resource.equals("gui/task.yml")&&current.equals(
+                List.of("DDDDDDDDD","DDDDDDDDD","DDDDDDDDD","DDDDDDDDD","#########"));
+        boolean taskPeriodFirst=resource.equals("gui/task.yml")&&current.equals(
+                List.of("DDDHDDDDD","DDDDDDDDD","DDDDDDDDD","DDDDDDDDD","#########"));
+        boolean rankWithoutReturn=resource.equals("gui/rank.yml")&&current.equals(
+                List.of("DDDDDDDDD","DDDDDDDDD","DDDDDDDDD","DDDDDDDDD","#########"));
+        if(!previous.isEmpty()&&(current.equals(previous)||legacyList||mixedList||fullTaskList||taskPeriodFirst||rankWithoutReturn)&&!current.equals(replacement)){
+            target.set("layout",replacement);return true;
+        }
+        return false;
     }
 
     private static boolean upgradeInboxMenus(YamlConfiguration target,YamlConfiguration defaults,String resource){

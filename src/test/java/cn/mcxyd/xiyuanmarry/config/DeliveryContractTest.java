@@ -58,4 +58,13 @@ class DeliveryContractTest {
         var c=read("config.yml");var m=read("messages.yml");ConfigurationManager.validate(c,m);
         c.set("identity.mode","BAD");assertThrows(IllegalArgumentException.class,()->ConfigurationManager.validate(c,m));
     }
+    @Test void invalidWeddingTimingConfigurationIsRejected()throws Exception {
+        var m=read("messages.yml");
+        var invite=read("config.yml");invite.set("wedding.invite-expire-hours",0);
+        assertThrows(IllegalArgumentException.class,()->ConfigurationManager.validate(invite,m));
+        var timeout=read("config.yml");timeout.set("wedding.ceremony-timeout-seconds",86401);
+        assertThrows(IllegalArgumentException.class,()->ConfigurationManager.validate(timeout,m));
+        var oath=read("config.yml");oath.set("wedding.oath-text","");
+        assertThrows(IllegalArgumentException.class,()->ConfigurationManager.validate(oath,m));
+    }
 }

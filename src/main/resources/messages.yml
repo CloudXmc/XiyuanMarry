@@ -23,6 +23,10 @@
   "proposal-sent": "<gradient:#F6B68D:#EF97BA>已向 {player} 发送{mode}求婚。</gradient>",
   "proposal-received": "<gradient:#EE9ECF:#B29CEE>{player}</gradient><gray>向你发起{mode}求婚；使用 /marry accept proposal 或 /marry deny proposal。</gray>",
   "request-missing": "<yellow>没有有效请求。</yellow>",
+  # 求婚操作等待期间配置、数据库或登录会话改变时提示；可自定义 MiniMessage，reload 生效，不修改历史数据。
+  "marriage-request-stale": "<gradient:#F6B68D:#DCA1D8>配置、数据源或登录状态已变化，本次求婚操作已取消，请重新操作。</gradient>",
+  # 婚姻变更请求在重载、切库、重登或原关系变化后取消；默认粉紫渐变，可自定义 MiniMessage；reload 生效，不影响数据。
+  "relationship-request-stale": "<gradient:#F6B68D:#DCA1D8>婚姻关系、配置或登录状态已变化，本次操作已取消，请重新查询后再试。</gradient>",
   "request-ambiguous": "<yellow>有多张有效请帖，请使用 /marry menu invitation 选择具体婚礼。</yellow>",
   "proposal-denied": "<gray>已拒绝请求。</gray>",
   "engaged": "<gradient:#FABD94:#EBA1CC>订婚成功，有效期 {hours} 小时；可 /marry cancel 取消。</gradient>",
@@ -42,9 +46,14 @@
   "oath-prompt": "<gradient:#FBCB97:#F29FBE>请在聊天中输入“{oath}”或使用 /marry oath 宣誓。</gradient>",
   "oath-waiting": "<gray>已记录你的誓言，等待伴侣独立确认。</gray>",
   "oath-missing": "<yellow>你当前不在有效婚礼仪式内。</yellow>",
+  "oath-position-required": "<gradient:#FBCB97:#F29FBE>请回到你的婚礼站位后再宣誓。</gradient>",
   "teleport-failed": "<red>传送未完成，请检查目的地后重试；婚礼传送失败时仪式会停止。</red>",
+  "database-not-ready": "<gradient:#FFD580:#FF9ACD>结婚系统正在加载数据，请稍后再试。</gradient>",
+  "startup-failed": "<gradient:#FF6B8A:#C084FC>结婚系统数据加载失败，当前业务已暂停，请联系管理员查看控制台。</gradient>",
+  "wedding-completion-failed": "<gradient:#FF6B8A:#C084FC>本次婚礼结果暂未确认，请使用 /marry info 查看当前状态；如有疑问请联系管理员。</gradient>",
   "invited": "<gradient:#E8B6E9:#B7B7F3>你收到 {player} 的婚礼请帖。使用 /marry accept invitation 或 /marry deny invitation。</gradient>",
   "invite-sent": "<green>请帖已发送。</green>",
+  "invite-already-accepted": "<yellow>该玩家已经接受这场婚礼请帖，无需重复发送。</yellow>",
   "invite-accepted": "<green>已接受婚礼邀请。</green>",
   "reload-success": "<green>配置已重新加载。</green>",
   "reload-failed": "<red>重载失败，继续使用上一份有效配置；详情见控制台。</red>",
@@ -62,7 +71,9 @@
   "state-divorce_pending": "离婚冷静期",
   "partner-chat": "<gradient:#F8AED0:#BCA8F3>♥ {player}</gradient><gray>：{message}</gray>",
   "teleport-success": "<green>已传送至伴侣身边。</green>",
-  "teleport-cooldown": "<yellow>传送冷却中，请稍后再试。</yellow>",
+  # 伴侣传送冷却：minutes 为整分钟，seconds 为剩余秒数，remaining-seconds 为总秒数；向上取整。
+  # 默认显示粉紫渐变倒计时；自定义文本支持 reload，保留现有冷却数据。
+  "teleport-cooldown": "<yellow>传送冷却中，剩余 <gradient:#F5ADCD:#B5A4F0>{minutes}分{seconds}秒</gradient>。</yellow>",
   "task-busy": "<yellow>情侣任务队列繁忙，请稍后再试。</yellow>",
   "task-completed": "<gradient:#F6B68D:#B69CF0>情侣任务完成：{task}，羁绊值 +{bond}。</gradient>",
   "ring-toggle": "<gray>戒指特效：{state}</gray>",
@@ -177,11 +188,23 @@
   "admin-help-clear": "<gray>/marryadmin clear ＜玩家＞ confirm — 终止关系并保存审计历史</gray>",
   "admin-help-help": "<gray>/marryadmin help — 查看已授权的管理指令</gray>",
   "task-loading": "<gradient:#9FDCC8:#A9BCEB>正在查询今日任务进度…</gradient>",
+  "task-loaded": "<gradient:#9FDCC8:#A9BCEB>今日任务进度已刷新：{task} <white>{progress}/{target}</white></gradient>",
+  "task-load-failed": "<red>任务进度查询失败，请稍后重试。</red>",
+  # 持久任务/群系记录不完整时提示；只暂停该任务，不自动重置、删数据或重新发奖。
+  # 默认渐变中文，支持 MiniMessage；修改后 reload 生效，不影响现有数据。
+  "task-data-invalid": "<gradient:#F29BA5:#EBC58D>任务记录异常，已保留原记录并暂停计数，请联系管理员核对。</gradient>",
+  "task-refresh-busy": "<yellow>任务进度正在查询，请稍候。</yellow>",
+  # 任务布局容量不足时显示；shown/total 为可见/总任务数，默认文案如下。
+  # 支持 MiniMessage，修改后 reload 生效；仅提示布局问题，不影响任务进度或历史数据。
+  "task-menu-overflow": "<yellow>当前菜单只能显示 <gradient:#F5ADCD:#B5A4F0>{shown}/{total}</gradient> 个任务，请联系管理员调整任务菜单布局。任务进度仍会正常记录。</yellow>",
   "task-state-active": "进行中",
   "task-state-completed": "已完成并发放羁绊",
   "task-state-past": "日期已结束",
   "task-state-locked": "尚未解锁",
   "task-entry-name": "第{cycle}轮 · 第{day}天 · {task}",
+  "task-period-name": "{year}年{month}月（第{cycle}）",
+  "task-period-description": "当前任务周期：{period}",
+  "task-period-cycle": "周期进度：{cycle} · 当前解锁第{day}天",
   "task-entry-description": "{status} | 今日进度 {progress}/{target} | 完成 +{bond} 羁绊",
   "task-other-description": "{status} | 目标 {target} | 完成 +{bond} 羁绊",
   "rank-select-description": "点击查看榜单；可使用 /marry rank ＜类型＞ 切换榜单",
@@ -199,6 +222,7 @@
   "help-acceptinvitation": "<gray>/marry acceptinvitation [婚礼编号] — 接受有效请帖；多张请帖可在 /marry menu invitation 选择</gray>",
   "help-denyinvitation": "<gray>/marry denyinvitation [婚礼编号] — 拒绝对应请帖；拒绝后需要新人重新邀请</gray>",
   "menu-loading": "<aqua>正在读取菜单内容…</aqua>",
+  "menu-load-failed": "<gradient:#FFB88C:#F49AC2>菜单内容暂时无法读取，本次请求已结束，请重新打开菜单重试。</gradient>",
   "menu-overflow": "<yellow>当前显示 {shown}/{total} 条；可用 /marry menu {page} ＜名称或编号＞ 缩小范围。领取箱也可用 /marry claim 查看完整文字列表。</yellow>",
   "menu-invitation-name": "{player1} ♥ {player2} 的婚礼",
   "menu-invitation-description": "婚礼编号：{id}",

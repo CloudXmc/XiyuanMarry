@@ -4,9 +4,9 @@
   "title": "<gradient:#F5ADCD:#B5A4F0>婚礼筹备</gradient>",
   "layout": [
     "#########",
-    "#LAIAGAA#",
-    "#AAASACA#",
+    "#LUVYIAA#",
     "#AAAAAAA#",
+    "#GASACAA#",
     "#########"
   ],
   "icons": {
@@ -30,6 +30,46 @@
         "<yellow>左键点击使用</yellow>"
       ],
       "action": "set-wedding-location",
+      "isEnchant": false,
+      "custom-model-data": 0,
+      "hideFlag": true,
+      "hideEnchant": true
+    },
+    "U": {
+      "name": "<gradient:#F5ADCD:#B5A4F0>设置新娘站位</gradient>",
+      "material": "PINK_BANNER",
+      "lore": [
+        "<gray>将当前位置设置为新娘站位（nx）。</gray>",
+        "<yellow>左键点击使用</yellow>"
+      ],
+      "action": "set-wedding-nx",
+      "isEnchant": false,
+      "custom-model-data": 0,
+      "hideFlag": true,
+      "hideEnchant": true
+    },
+    "V": {
+      "name": "<gradient:#F5ADCD:#B5A4F0>设置新郎站位</gradient>",
+      "material": "BLUE_BANNER",
+      "lore": [
+        "<gray>将当前位置设置为新郎站位（nl）。</gray>",
+        "<yellow>左键点击使用</yellow>"
+      ],
+      "action": "set-wedding-nl",
+      "isEnchant": false,
+      "custom-model-data": 0,
+      "hideFlag": true,
+      "hideEnchant": true
+    },
+    "Y": {
+      "name": "<gradient:#F5ADCD:#B5A4F0>设置司仪站位</gradient>",
+      "material": "LECTERN",
+      "lore": [
+        "<gray>将当前位置设置为司仪站位（ly）。</gray>",
+        "<gray>当前版本保存站位，不绑定司仪玩家或 NPC。</gray>",
+        "<yellow>左键点击使用</yellow>"
+      ],
+      "action": "set-wedding-ly",
       "isEnchant": false,
       "custom-model-data": 0,
       "hideFlag": true,

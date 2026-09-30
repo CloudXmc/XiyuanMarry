@@ -8,6 +8,8 @@ import cn.mcxyd.xiyuanmarry.scheduler.UnifiedScheduler;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CancellationException;
+import java.util.function.Consumer;
 
 /** 同一次事务读取两类收件箱，避免嵌套提交争锁或跨数据库代次拼接列表。 */
 public final class ClaimInboxService implements AutoCloseable {
@@ -35,23 +37,34 @@ public final class ClaimInboxService implements AutoCloseable {
 
     /** 同一读取流程服务聊天和 GUI；consumer 只在玩家实体所有者上下文调用。 */
     public void load(PlayerSnapshot actor,java.util.function.BiConsumer<org.bukkit.entity.Player,List<InboxMessage>> consumer) {
-        if (closed) return;
-        UUID databaseGeneration = database.generation(), configGeneration = config.snapshot().generation();
-        marriages.submit(actor.liveId(), repository -> {
+        load(actor, consumer, error -> {});
+    }
+
+    /** 失败回调只交接异常或清理内存；调用方访问玩家时必须重新进入实体上下文。 */
+    public void load(PlayerSnapshot actor,java.util.function.BiConsumer<org.bukkit.entity.Player,List<InboxMessage>> consumer,
+                     Consumer<Throwable> failed) {
+        if (closed || actor == null) { failed.accept(new CancellationException("收件箱读取已失效")); return; }
+        final UUID databaseGeneration, configGeneration;
+        try { databaseGeneration = database.generation(); configGeneration = config.snapshot().generation(); }
+        catch (RuntimeException unavailable) { failed.accept(unavailable); return; }
+        marriages.submitAtGeneration(actor.liveId(), databaseGeneration, repository -> {
             if (!current(databaseGeneration, configGeneration)) return List.<InboxMessage>of();
             var result = new ArrayList<>(rewards.inboxMessages(repository, actor.id()));
             result.addAll(gifts.inboxMessages(repository, actor.id()));
             return List.copyOf(result);
         }, result -> {
-            if (!current(databaseGeneration, configGeneration)) return;
+            if (!current(databaseGeneration, configGeneration)) { failed.accept(new CancellationException("收件箱读取已失效")); return; }
             scheduler.player(actor.liveId(), player -> {
-                if (!current(databaseGeneration, configGeneration)) return;
+                if (!current(databaseGeneration, configGeneration)) { failed.accept(new CancellationException("收件箱读取已失效")); return; }
                 var live = marriages.directory().live(actor.liveId());
-                if (live == null || !live.id().equals(actor.id()) || !live.identityKey().equals(actor.identityKey())) return;
+                if (live == null || !live.id().equals(actor.id()) || !live.identityKey().equals(actor.identityKey())
+                        || player.isDead() || !player.hasPermission("marry.use")) {
+                    failed.accept(new CancellationException("收件箱读取已失效")); return;
+                }
                 // 已回到玩家实体上下文，直接输出同一批快照，避免再排队产生旧结果窗口。
                 consumer.accept(player,result);
-            });
-        });
+            }, () -> failed.accept(new CancellationException("收件人已离线")));
+        }, failed);
     }
 
     private boolean current(UUID databaseGeneration, UUID configGeneration) {

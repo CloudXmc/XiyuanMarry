@@ -1,4 +1,4 @@
-param([string]$Version = '2.10.0')
+param([string]$Version = '2.10.43')
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 Set-Location -LiteralPath $root
@@ -13,7 +13,8 @@ $traditional = Scan-Java 'Bukkit[.]getScheduler|scheduleSyncDelayedTask|schedule
 $unavailable = Scan-Java 'PlayerRespawnEvent|PlayerTeleportEvent|PlayerChangedWorldEvent|WorldLoadEvent|WorldUnloadEvent'
 $join = Scan-Java '[.]join[(][ ]*[)]|Future[.]get[(]'
 $allTeleport = Scan-Java '[.]teleport[(]'
-$realTeleport = @($allTeleport | Where-Object { $_ -notmatch 'service[.]teleport[(]players[.]capture' })
+# 此入口调用自己的业务服务，真正传送仍由 UnifiedScheduler.teleportAsync 执行。
+$realTeleport = @($allTeleport | Where-Object { $_ -notmatch 'TeleportSubcommand[.]java:[0-9]+:.*service[.]teleport[(]actor[)]' })
 $getCandidates = Scan-Java '[.]get[(][ ]*[)]'
 $reflection = Scan-Java 'Class[.]forName|getDeclaredMethod|java[.]lang[.]reflect'
 $scheduler = Scan-Java 'getAsyncScheduler|getGlobalRegionScheduler|getRegionScheduler|getScheduler[(]'
@@ -65,6 +66,11 @@ $result = [ordered]@{
 }
 $result | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $output "verification-$Version.json") -Encoding utf8
 [ordered]@{version=$Version; tests=$result.tests; jarEntries=$entries.Count; javaClassMajor=$major; foreignClasses=$foreign.Count; report="outputs/verification-$Version.json"} | ConvertTo-Json -Depth 6
+
+
+
+
+
 
 
 

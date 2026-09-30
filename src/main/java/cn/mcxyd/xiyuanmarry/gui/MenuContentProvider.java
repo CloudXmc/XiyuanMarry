@@ -80,6 +80,23 @@ public final class MenuContentProvider {
                 "status",status,"progress",row.progress(),"target",row.definition().target(),"bond",row.definition().bondReward()));
         }).toList();
     }
+    /** 固定在任务菜单中的周期卡片，只传递不可变字符串和数字。 */
+    public Object[] taskPeriodTokens(DailyTask today, java.time.LocalDate date) {
+        long cycle=today.daySerial()/30+1;
+        String cycleName=chineseNumber(cycle)+"轮";
+        String period=plain("task-period-name","year",date.getYear(),"month",date.getMonthValue(),"cycle",cycleName);
+        String description=plain("task-period-description","period",period);
+        String cycleDescription=plain("task-period-cycle","cycle",cycleName,"day",today.cycleDay());
+        return new Object[]{"task.period",period,"task.description",description,"task.cycle",cycleDescription};
+    }
+    private String chineseNumber(long value) {
+        if(value<=0)return "零";
+        String[] digits={"零","一","二","三","四","五","六","七","八","九"};
+        if(value<10)return digits[(int)value];
+        if(value<20)return "十"+(value==10?"":digits[(int)(value%10)]);
+        if(value<100)return digits[(int)(value/10)]+"十"+(value%10==0?"":digits[(int)(value%10)]);
+        return Long.toString(value);
+    }
     private String plain(String key,Object...values) {return net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(messages.renderer().format(messages.raw(key),values));}
     private String format(double value) {return String.format(Locale.ROOT, "%.3f", value);}
     private String boardTitle(String mode) {String key=switch(mode){case "bond"->"bond-level";case "total"->"bond-total";default->mode;};return config.file("rank.yml").getString("types."+key,messages.raw("rank-header"));}

@@ -169,4 +169,13 @@ class WeeklyRewardLedgerTest {
             assertEquals(2, r.entries("reward-inbox").size());
         }
     }
+    @Test void malformedCursorFreezesBoardWithoutCreatingTickets() {
+        try (var r = new SqliteMarriageRepository(dir.resolve("malformed-cursor.db"))) {
+            couple(r, 100);
+            r.put(WeeklyRewardLedger.CURSORS, "bond", "not-json");
+            assertDoesNotThrow(() -> scan(r, "2026-09-27T20:00:00"));
+            assertTrue(r.entries("reward-inbox").isEmpty());
+            assertEquals("not-json", r.get(WeeklyRewardLedger.CURSORS, "bond"));
+        }
+    }
 }

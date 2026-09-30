@@ -25,7 +25,7 @@ class WeddingInvitationFlowTest {
         repository=new SqliteMarriageRepository(root.resolve("invitations.db"));
         when(marriages.json()).thenReturn(json);
         when(marriages.setting("marriage.engagement-hours",48)).thenReturn(48L);
-        doAnswer(call->{Function<MarriageRepository,Object> work=call.getArgument(1);Consumer<Object> done=call.getArgument(2);done.accept(work.apply(repository));return null;})
+        doAnswer(call->{Function<MarriageRepository,Object> work=call.getArgument(1);Consumer<Object> done=call.getArgument(2);done.accept(repository.transaction(work));return null;})
                 .when(marriages).submit(any(),any(),any());
         weddings=new WeddingService(marriages,mock(ConfigurationManager.class),mock(UnifiedScheduler.class));
     }
@@ -73,6 +73,58 @@ class WeddingInvitationFlowTest {
         assertThrows(RuleViolation.class,()->weddings.respond(guest,first.id(),true));
         assertThrows(RuleViolation.class,()->weddings.respond(guest,UUID.randomUUID().toString(),false));
     }
+    @Test void acceptedInvitationRemainsValidUntilEngagementEnds(){
+        var marriage=invite(false);
+        weddings.respond(guest,marriage.id(),true);
+        long engagementDeadline=marriage.createdAt()+48L*3600000L;
+        var accepted=plan(marriage.id());
+        assertEquals(engagementDeadline,accepted.invites().get(guestId).expires());
+        assertTrue(WeddingGiftPolicy.canSend(accepted,guestId,marriage,marriage.createdAt()+25L*3600000L));
+        assertTrue(WeddingGiftPolicy.canSend(accepted,guestId,marriage,engagementDeadline-1));
+        assertFalse(WeddingGiftPolicy.canSend(accepted,guestId,marriage,engagementDeadline));
+        assertTrue(weddings.pendingInvitations(repository,guestId).isEmpty());
+    }
+    @Test void acceptedInviteCannotOutliveShorterEngagement(){
+        when(marriages.setting("marriage.engagement-hours",48)).thenReturn(1L);
+        var marriage=invite(false);
+        put(marriage.id(),WeddingPlan.empty().invite(guestId,new WeddingPlan.Invite(false,
+                marriage.createdAt()+24L*3600000L)));
+        weddings.respond(guest,marriage.id(),true);
+        assertEquals(marriage.createdAt()+3600000L,plan(marriage.id()).invites().get(guestId).expires());
+    }
+    @Test void expiredUnansweredInviteIsNotRevivedByAcceptance(){
+        var marriage=invite(false);
+        put(marriage.id(),WeddingPlan.empty().invite(guestId,new WeddingPlan.Invite(false,System.currentTimeMillis()-1000)));
+        String before=repository.get("weddings",marriage.id());
+        assertThrows(RuntimeException.class,()->weddings.respond(guest,marriage.id(),true));
+        assertEquals(before,repository.get("weddings",marriage.id()));
+    }
+    @Test void acceptingOneInvitePreservesOtherGuestsAndPoints(){
+        var marriage=invite(false);var other=UUID.randomUUID();
+        var point=new PlayerSnapshot.Point(UUID.randomUUID(),12,70,24,0,0);
+        var before=plan(marriage.id()).point("location",point)
+                .invite(other,new WeddingPlan.Invite(false,System.currentTimeMillis()+60000));
+        put(marriage.id(),before);weddings.respond(guest,marriage.id(),true);
+        var after=plan(marriage.id());
+        assertEquals(before.points(),after.points());assertEquals(before.invites().get(other),after.invites().get(other));
+    }
+    @Test void resendingAcceptedInviteCannotResetGuestAcceptance(){
+        UUID one=UUID.randomUUID(),two=UUID.randomUUID();
+        repository.createEngagement(one,two,"WEDDING",System.currentTimeMillis());
+        var marriage=repository.findByPlayer(one);
+        var accepted=new WeddingPlan.Invite(true,marriage.createdAt()+48L*3600000L);
+        put(marriage.id(),WeddingPlan.empty().invite(guestId,accepted));
+        var actor=new PlayerSnapshot(one,one,"one","One",60,null,1);
+        assertThrows(RuleViolation.class,()->weddings.invite(actor,guest));
+        assertEquals(accepted,plan(marriage.id()).invites().get(guestId));
+    }
+    @Test void acceptedDeadlineSurvivesRepositoryRestart(){
+        var marriage=invite(false);weddings.respond(guest,marriage.id(),true);
+        var before=plan(marriage.id());repository.close();
+        repository=new SqliteMarriageRepository(root.resolve("invitations.db"));
+        assertEquals(before,plan(marriage.id()));
+        assertTrue(WeddingGiftPolicy.canSend(plan(marriage.id()),guestId,marriage,marriage.createdAt()+25L*3600000L));
+    }
     @Test void anotherGuestCannotReadOrRespondToAnInvitation(){
         var first=invite(false);UUID other=UUID.randomUUID();
         assertTrue(weddings.pendingInvitations(repository,other).isEmpty());
@@ -84,5 +136,11 @@ class WeddingInvitationFlowTest {
         var invitations=new WeddingInvitationService(marriages,id->id.equals(first.id()));
         assertTrue(invitations.pending(repository,guestId).isEmpty());
         assertThrows(RuleViolation.class,()->invitations.respond(guest,first.id(),true));
+    }
+    @Test void malformedWeddingPlanIsSkippedWithoutBreakingInbox(){
+        var marriage=invite(false);
+        repository.put("weddings",marriage.id(),"not-json");
+        assertDoesNotThrow(() -> weddings.pendingInvitations(repository,guestId));
+        assertTrue(weddings.pendingInvitations(repository,guestId).isEmpty());
     }
 }

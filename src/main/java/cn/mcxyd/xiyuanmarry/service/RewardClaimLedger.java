@@ -49,6 +49,12 @@ final class RewardClaimLedger {
     }
     private RewardTicket read(MarriageRepository repository, UUID id) {
         String json = repository.get(INBOX, id.toString());
-        return json == null ? null : gson.fromJson(json, RewardTicket.class);
+        if (json == null) return null;
+        try {
+            var ticket = gson.fromJson(json, RewardTicket.class);
+            // 预占和确认必须指向同一行，不能信任载荷里另一个票据编号。
+            return ticket != null && id.equals(ticket.id()) ? ticket : null;
+        }
+        catch (RuntimeException invalid) { return null; }
     }
 }

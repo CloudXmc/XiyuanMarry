@@ -138,10 +138,23 @@ public final class RewardService implements AutoCloseable {
 
     /** 找不到奖励票据时回调 false，让 GiftService 继续处理物品礼物。 */
     public void claim(PlayerSnapshot actor, UUID id, Consumer<Boolean> next) {
+        if (actor == null || id == null) {
+            if (next != null) next.accept(true);
+            return;
+        }
         claims.claim(actor, id, next);
     }
 
-    private List<RewardTicket> all(MarriageRepository r) { List<RewardTicket> out = new ArrayList<>(); for (String raw : r.entries(BUCKET).values()) try { RewardTicket t = gson.fromJson(raw, RewardTicket.class); if (t != null) out.add(t); } catch (RuntimeException ignored) {} return out; }
+    private List<RewardTicket> all(MarriageRepository r) {
+        List<RewardTicket> out = new ArrayList<>();
+        for (var entry : r.entries(BUCKET).entrySet()) try {
+            RewardTicket ticket = gson.fromJson(entry.getValue(), RewardTicket.class);
+            if (valid(ticket) && entry.getKey().equals(ticket.id().toString())) out.add(ticket);
+        } catch (RuntimeException ignored) {}
+        return out;
+    }
+    private boolean valid(RewardTicket ticket) { return ticket != null && ticket.id() != null && ticket.recipient() != null
+            && ticket.state() != null && ticket.commands() != null && ticket.created() >= 0 && ticket.updated() >= 0; }
 
     @Override public void close() { closed = true; if (timer != null) timer.cancel(); settings = null; claims.close(); }
 }

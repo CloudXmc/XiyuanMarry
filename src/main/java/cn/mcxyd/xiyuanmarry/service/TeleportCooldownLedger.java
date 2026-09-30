@@ -6,7 +6,12 @@ public final class TeleportCooldownLedger {
     public Ticket reserve(MarriageRepository r,UUID actor,long now,long duration) {
         if (duration<0 || duration>86400000L) throw new IllegalArgumentException("传送冷却超出范围");
         return r.transaction(tx->{
-            RuleViolation.require(MarriageService.number(tx,"teleport-cooldowns",actor.toString())<=now,"teleport-cooldown");
+            long until=MarriageService.number(tx,"teleport-cooldowns",actor.toString());
+            if(until>now){
+                // 从事务读取的既有到期时间计算；向上取整，避免仍受限时显示剩余 0 秒。
+                long millis=until-now,seconds=millis/1000+(millis%1000==0?0:1);
+                throw new RuleViolation("teleport-cooldown","minutes",seconds/60,"seconds",seconds%60,"remaining-seconds",seconds);
+            }
             var ticket=new Ticket(actor,UUID.randomUUID().toString(),now+duration);
             tx.put("teleport-cooldowns",actor.toString(),Long.toString(ticket.until()));
             tx.put("teleport-tokens",actor.toString(),ticket.token());

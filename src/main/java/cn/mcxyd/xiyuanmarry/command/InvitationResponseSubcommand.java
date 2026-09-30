@@ -22,7 +22,11 @@ public final class InvitationResponseSubcommand implements Subcommand {
     public List<String> complete(CommandSender sender,String[] args){return List.of();}
     public void execute(CommandSender sender,String label,String[] args){
         if(args.length>1){messages.send(sender,"invalid-argument");return;}
-        String selected=args.length==0?null:UUID.fromString(args[0]).toString();
+        String selected=null;
+        if(args.length==1){
+            try { selected=UUID.fromString(args[0]).toString(); }
+            catch(IllegalArgumentException invalid){messages.send(sender,"invalid-argument");return;}
+        }
         var actor=players.capture((Player)sender);
         if(selected==null)weddings.respond(actor,accept);else weddings.respond(actor,selected,accept);
     }

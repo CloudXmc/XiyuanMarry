@@ -89,6 +89,11 @@ class GiftSendFlowTest {
     @AfterEach void cleanup() { if(gifts!=null)gifts.close(); if(bukkit!=null)bukkit.close(); if(items!=null)items.close(); }
 
     @Test void partnerReservationBindsToCapturedGeneration() { gifts.send(actor); assertEquals(generation,jobs.remove().generation()); }
+    @Test void concurrentSendAttemptsFromOnePlayerCreateOnlyOneReservation() {
+        gifts.send(actor); gifts.send(actor);
+        assertEquals(1, jobs.size());
+        verify(marriages).notifyLive(live, "busy");
+    }
     @Test void weddingReservationAndConfirmationBindToSameGeneration() {
         relationship(true); gifts.weddingGift(actor,recipient); var first=jobs.remove();
         assertEquals(generation,first.generation()); first.finish(first.write(repository));
@@ -129,6 +134,19 @@ class GiftSendFlowTest {
         assertTrue(data.get(id.toString()).contains("REVIEW"));
         assertTrue(notices.stream().anyMatch(n->n.key().equals("delivery-review")));
     }
+    @Test void malformedWeddingIdIsIgnoredInsteadOfBreakingInbox() {
+        UUID id=UUID.randomUUID();
+        data.put(id.toString(),gson.toJson(Map.of("id",id,"sender",recipient,"recipient",sender,
+                "state","COMMITTED","kind","WEDDING","weddingId","not-a-uuid","item","AQID")));
+        var notices=assertDoesNotThrow(() -> gifts.inboxMessages(repository,sender));
+        assertTrue(notices.stream().anyMatch(n->n.key().equals("gift-none")),"损坏婚礼编号不能让收件箱查询抛异常");
+    }
+    @Test void incompleteGiftRecordIsIgnoredInsteadOfBreakingInbox() {
+        UUID id=UUID.randomUUID();
+        data.put(id.toString(),gson.toJson(Map.of("id",id,"state","COMMITTED","kind","PARTNER","item","AQID")));
+        var notices=assertDoesNotThrow(() -> gifts.inboxMessages(repository,sender));
+        assertTrue(notices.stream().anyMatch(n->n.key().equals("gift-none")),"字段缺失的礼物记录不能让收件箱查询抛异常");
+    }
     @Test void confirmedRollbackReturnsOnlyOnceAndNeverDeletesTickets() {
         gifts.send(actor); var first=jobs.remove(); first.write(repository); data.clear();
         var failure=new IllegalStateException("rolled back");
@@ -167,8 +185,24 @@ class GiftSendFlowTest {
         gifts.claim(actor,claimable()); writes(); gifts.close(); entities();
         verify(inventory,never()).addItem(any(ItemStack.class));
     }
+    @Test void missingSnapshotRetainsGiftForReviewWithoutInsertingItems() {
+        UUID gift=claimable(); gifts.claim(actor,gift); writes();
+        when(marriages.directory().capture(player)).thenReturn(null);
+        assertDoesNotThrow(this::entities); writes();
+        verify(inventory,never()).addItem(any(ItemStack.class));
+        assertTrue(data.get(gift.toString()).contains("REVIEW"));
+        verify(marriages).notifyLive(live,"delivery-review");
+    }
     @Test void deadPlayerDoesNotReceiveQueuedGift() {
         gifts.claim(actor,claimable()); writes(); when(player.isDead()).thenReturn(true); entities();
         verify(inventory,never()).addItem(any(ItemStack.class));
+    }
+    @Test void inventoryWriteFailureFreezesTicketInsteadOfRetryingItem() {
+        UUID gift = claimable(); gifts.claim(actor, gift); writes();
+        when(inventory.getContents()).thenReturn(new ItemStack[36]);
+        when(inventory.addItem(any(ItemStack.class))).thenThrow(new IllegalStateException("inventory failure"));
+        entities(); writes();
+        assertTrue(data.get(gift.toString()).contains("REVIEW"));
+        verify(inventory, times(1)).addItem(any(ItemStack.class));
     }
 }

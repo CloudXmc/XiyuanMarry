@@ -71,4 +71,21 @@ class DailyTaskLedgerTest {
             assertEquals(20,r.findByPlayer(one).bond());
         }
     }
+    @Test void malformedSavedTaskDoesNotBreakTaskRead(){
+        try(var r=new SqliteMarriageRepository(dir.resolve("malformed-task.db"))){
+            r.createMarriage(one,two,"NORMAL",1000); var marriage=r.findByPlayer(one);
+            r.put(DailyTaskLedger.BUCKET,marriage.id(),"not-json");
+            assertDoesNotThrow(() -> ledger.current(r,marriage,2000,task));
+        }
+    }
+    @Test void malformedBiomeLedgerDoesNotAwardOrThrow(){
+        var definition=new TaskDefinition("explore","BIOME","发现新群系","*",1,20);
+        try(var r=new SqliteMarriageRepository(dir.resolve("malformed-biome.db"))){
+            r.createMarriage(one,two,"NORMAL",1000); String id=r.findByPlayer(one).id();
+            ledger.current(r,r.findByPlayer(one),2000,definition);
+            r.put(DailyTaskLedger.BIOME_BUCKET,id,"not-json");
+            assertDoesNotThrow(() -> ledger.record(r,one,id,3000,definition,new CoupleTaskService.Event("BIOME","minecraft:plains",1)));
+            assertEquals(0,r.findByPlayer(one).bond());
+        }
+    }
 }

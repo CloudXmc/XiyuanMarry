@@ -16,6 +16,7 @@ import java.util.*;
 import java.util.Base64;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CancellationException;
+import java.util.logging.Logger;
 
 import static cn.mcxyd.xiyuanmarry.service.RuleViolation.require;
 
@@ -29,6 +30,9 @@ public final class GiftService implements AutoCloseable {
     private final DatabaseManager database;
     private final Gson gson;
     private final ConcurrentHashMap<UUID, GiftSendAttempt> pendingSends = new ConcurrentHashMap<>();
+    /** 一个玩家同一时刻只能有一个送礼事务，避免重复点击在同一物品快照上产生多个票据。 */
+    private final ConcurrentHashMap<UUID, UUID> sendByPlayer = new ConcurrentHashMap<>();
+    private static final Logger LOGGER = Logger.getLogger(GiftService.class.getName());
     private final Object sendLifecycle = new Object();
     private volatile boolean closed;
 
@@ -56,7 +60,7 @@ public final class GiftService implements AutoCloseable {
         UUID recipient = marriage.partnerOf(actor.id());
         Gift gift = new Gift(UUID.randomUUID(), actor.id(), recipient, System.currentTimeMillis(), System.currentTimeMillis(), "RESERVED", Base64.getEncoder().encodeToString(bytes), "PARTNER", marriage.id(), null, null);
         GiftSendAttempt pending = new GiftSendAttempt(actor.liveId(), bytes, database == null ? marriages.databaseGeneration() : database.generation());
-        if (!track(gift.id(), pending)) return;
+        if (!track(gift.id(), pending)) { marriages.notifyLive(actor.liveId(), "busy"); return; }
         player.getInventory().setItemInMainHand(null);
         marriages.submitAtGeneration(actor.liveId(), pending.generation(), r -> {
             if (!pending.begin()) throw new CancellationException("礼物发送已取消");
@@ -80,13 +84,19 @@ public final class GiftService implements AutoCloseable {
         if (engagement == null || engagement.state() != MarriageState.ENGAGED || !engagement.type().equals("WEDDING")) { marriages.notifyLive(guest.liveId(), "wedding-gift-invalid"); return; }
         Gift gift = new Gift(UUID.randomUUID(), guest.id(), newlywed, System.currentTimeMillis(), System.currentTimeMillis(), "RESERVED", Base64.getEncoder().encodeToString(bytes), "WEDDING", engagement.id(), null, null);
         GiftSendAttempt pending = new GiftSendAttempt(guest.liveId(), bytes, database == null ? marriages.databaseGeneration() : database.generation());
-        if (!track(gift.id(), pending)) return;
+        if (!track(gift.id(), pending)) { marriages.notifyLive(guest.liveId(), "busy"); return; }
         player.getInventory().setItemInMainHand(null);
         marriages.submitAtGeneration(guest.liveId(), pending.generation(), r -> {
             if (!pending.begin()) throw new CancellationException("礼物发送已取消");
             MarriageRecord current = r.findByPlayer(newlywed);
             String planJson = r.get("weddings", engagement.id());
-            WeddingPlan plan = planJson == null ? WeddingPlan.empty() : gson.fromJson(planJson, WeddingPlan.class);
+            WeddingPlan plan;
+            try { plan = planJson == null ? WeddingPlan.empty() : gson.fromJson(planJson, WeddingPlan.class); }
+            catch (RuntimeException invalid) {
+                marriages.warnMetadata("weddings", engagement.id());
+                throw new RuleViolation("wedding-gift-invalid");
+            }
+            require(plan != null && plan.invites() != null, "wedding-gift-invalid");
             require(current != null && current.id().equals(engagement.id())
                     && WeddingGiftPolicy.canSend(plan, guest.id(), current, System.currentTimeMillis()), "wedding-gift-invalid");
             r.put(BUCKET, gift.id().toString(), gson.toJson(gift));
@@ -98,9 +108,16 @@ public final class GiftService implements AutoCloseable {
     private boolean track(UUID id, GiftSendAttempt pending) {
         // 此短锁内不调度、不读写库存、不执行 IO；关闭后不再登记新尝试。
         synchronized (sendLifecycle) {
-            if (closed) return false;
+            if (closed || sendByPlayer.putIfAbsent(pending.liveId(), id) != null) return false;
             pendingSends.put(id, pending);
             return true;
+        }
+    }
+
+    private void untrack(UUID id, GiftSendAttempt pending) {
+        synchronized (sendLifecycle) {
+            pendingSends.remove(id, pending);
+            sendByPlayer.remove(pending.liveId(), id);
         }
     }
 
@@ -115,7 +132,7 @@ public final class GiftService implements AutoCloseable {
         }, ok -> {
             if (!ok) { reviewSend(gift.id(), pending); return; }
             pending.finish();
-            pendingSends.remove(gift.id(), pending);
+            untrack(gift.id(), pending);
             if (!closed) {
                 marriages.notifyLive(pending.liveId(), message);
                 marriages.notifyIdentity(gift.recipient(), "reward-pending");
@@ -150,7 +167,7 @@ public final class GiftService implements AutoCloseable {
     }
 
     public void claim(PlayerSnapshot actor, UUID id) {
-        if (closed) return;
+        if (closed || actor == null || id == null) return;
         UUID generation = database == null ? marriages.databaseGeneration() : database.generation();
         marriages.submitAtGeneration(actor.liveId(), generation, r -> { recover(r, System.currentTimeMillis()); Gift gift = read(r, id); MarriageRecord current = r.findByPlayer(actor.id()); require(gift != null && visibleTo(gift, actor.id(), current), "gift-missing"); require(!gift.state().equals("CLAIMING"), "delivery-review"); require(gift.state().equals("COMMITTED"), "gift-missing"); Gift claiming = claiming(gift, UUID.randomUUID(), generation); r.put(BUCKET, id.toString(), gson.toJson(claiming)); return claiming; }, gift -> scheduler.player(actor.liveId(), p -> insert(p, gift, actor, generation), () -> markReview(id, giftToken(gift), generation)), error -> marriages.notifyLive(actor.liveId(), error instanceof DatabaseManager.StaleGenerationException ? "delivery-review" : "gift-missing"));
     }
@@ -162,26 +179,48 @@ public final class GiftService implements AutoCloseable {
             return;
         }
         PlayerSnapshot current = marriages.directory().capture(player);
-        if (!current.id().equals(actor.id()) || !current.identityKey().equals(actor.identityKey())) { markReview(gift.id(), gift.claimToken(), generation); marriages.notifyLive(actor.liveId(), "delivery-review"); return; }
+        if (current == null || !current.id().equals(actor.id()) || !current.identityKey().equals(actor.identityKey())) { markReview(gift.id(), gift.claimToken(), generation); marriages.notifyLive(actor.liveId(), "delivery-review"); return; }
         ItemStack item;
         try { item = ItemStack.deserializeBytes(Base64.getDecoder().decode(gift.item())); } catch (RuntimeException ex) { markReview(gift.id(), gift.claimToken(), generation); marriages.notifyLive(player.getUniqueId(), "gift-invalid"); return; }
-        ItemStack[] before = cloneContents(player.getInventory().getContents());
-        var leftovers = player.getInventory().addItem(item);
-        if (!leftovers.isEmpty()) { player.getInventory().setContents(before); releaseClaim(gift.id(), gift.claimToken(), generation); marriages.notifyLive(player.getUniqueId(), "inventory-full"); return; }
+        ItemStack[] before;
+        Map<Integer, ItemStack> leftovers;
+        try {
+            before = cloneContents(player.getInventory().getContents());
+            leftovers = player.getInventory().addItem(item);
+        } catch (RuntimeException failure) {
+            // Inventory API 异常时无法证明物品是否写入；冻结票据，禁止自动重试造成重复物品。
+            markReview(gift.id(), gift.claimToken(), generation);
+            marriages.notifyLive(actor.liveId(), "delivery-review");
+            return;
+        }
+        if (!leftovers.isEmpty()) {
+            try {
+                // addItem 可能只写入部分槽位；完整恢复快照后才允许票据回到 COMMITTED。
+                player.getInventory().setContents(before);
+            } catch (RuntimeException failure) {
+                // 恢复失败时无法证明库存状态，冻结票据，禁止再次领取同一物品。
+                markReview(gift.id(), gift.claimToken(), generation);
+                marriages.notifyLive(actor.liveId(), "delivery-review");
+                return;
+            }
+            releaseClaim(gift.id(), gift.claimToken(), generation);
+            marriages.notifyLive(actor.liveId(), "inventory-full");
+            return;
+        }
         UUID live = actor.liveId();
         marriages.submitAtGeneration(null, generation, r -> { Gift currentGift = read(r, gift.id()); if (currentGift == null || !currentGift.state().equals("CLAIMING") || !Objects.equals(currentGift.claimToken(), gift.claimToken()) || !Objects.equals(currentGift.claimGeneration(), generation)) return false; r.remove(BUCKET, gift.id().toString()); return true; }, ok -> { if (ok) marriages.notifyLive(live, "reward-received"); else marriages.notifyLive(live, "delivery-review"); }, error -> marriages.notifyLive(live, "delivery-review"));
     }
 
     private void restore(UUID live, byte[] bytes) { scheduler.player(live, p -> { ItemStack item = ItemStack.deserializeBytes(bytes); var leftovers = p.getInventory().addItem(item); if (!leftovers.isEmpty()) p.getWorld().dropItemNaturally(p.getLocation(), leftovers.values().iterator().next()); }); }
     private void failSend(UUID id, GiftSendAttempt pending, Throwable error) {
-        pendingSends.remove(id, pending);
+        untrack(id, pending);
         if (pending.returnOnce(TransactionRollbackException.confirmed(error))) {
             // 回滚已确认时没有票据可删；更不能在新数据库里按旧编号删除。
             restore(pending.liveId(), pending.item());
         } else reviewSend(id, pending);
     }
     private void reviewSend(UUID id, GiftSendAttempt pending) {
-        pendingSends.remove(id, pending);
+        untrack(id, pending);
         if (pending.review()) {
             markReservedReview(id, pending.generation());
             marriages.notifyLive(pending.liveId(), "delivery-review");
@@ -197,10 +236,33 @@ public final class GiftService implements AutoCloseable {
     private boolean isWedding(Gift gift) { return "WEDDING".equals(gift.kind()); }
     private boolean visibleTo(Gift gift, UUID actor, MarriageRecord current) {
         if (!isWedding(gift)) return gift.recipient().equals(actor);
-        return WeddingGiftPolicy.canClaim(gift.weddingId() == null ? null : UUID.fromString(gift.weddingId()), actor, current);
+        UUID weddingId = parseWeddingId(gift);
+        return weddingId != null && WeddingGiftPolicy.canClaim(weddingId, actor, current);
     }
-    private Gift read(MarriageRepository r, UUID id) { String raw = r.get(BUCKET, id.toString()); return raw == null ? null : gson.fromJson(raw, Gift.class); }
-    private List<Gift> all(MarriageRepository r) { List<Gift> out = new ArrayList<>(); for (String raw : r.entries(BUCKET).values()) { try { Gift gift = gson.fromJson(raw, Gift.class); if (gift != null && gift.id() != null) out.add(gift); } catch (RuntimeException ignored) {} } return out; }
+    private UUID parseWeddingId(Gift gift) {
+        if (gift.weddingId() == null || gift.weddingId().isBlank()) return null;
+        try { return UUID.fromString(gift.weddingId()); }
+        catch (IllegalArgumentException invalid) {
+            LOGGER.warning("结婚系统检测到损坏的婚礼贺礼记录，已跳过：" + gift.id());
+            return null;
+        }
+    }
+    private Gift read(MarriageRepository r, UUID id) {
+        String raw = r.get(BUCKET, id.toString());if (raw == null) return null;
+        try { Gift gift = gson.fromJson(raw, Gift.class);return valid(gift) && id.equals(gift.id()) ? gift : null; }
+        catch (RuntimeException ignored) { return null; }
+    }
+    private List<Gift> all(MarriageRepository r) {
+        List<Gift> out = new ArrayList<>();
+        // 恢复逻辑也使用此入口，键错配的记录原样保留，不能写到另一条礼物上。
+        for (var entry : r.entries(BUCKET).entrySet()) try {
+            Gift gift = gson.fromJson(entry.getValue(), Gift.class);
+            if (valid(gift) && entry.getKey().equals(gift.id().toString())) out.add(gift);
+        } catch (RuntimeException ignored) {}
+        return out;
+    }
+    private boolean valid(Gift gift) { return gift != null && gift.id() != null && gift.sender() != null && gift.recipient() != null
+            && gift.state() != null && gift.kind() != null; }
     private static ItemStack[] cloneContents(ItemStack[] source) { ItemStack[] copy = new ItemStack[source.length]; for (int i = 0; i < source.length; i++) copy[i] = source[i] == null ? null : source[i].clone(); return copy; }
 
     @Override public void close() {
@@ -209,6 +271,7 @@ public final class GiftService implements AutoCloseable {
             closed = true;
             closing = Map.copyOf(pendingSends);
             pendingSends.clear();
+            sendByPlayer.clear();
         }
         for (var entry : closing.entrySet()) {
             GiftSendAttempt pending = entry.getValue();

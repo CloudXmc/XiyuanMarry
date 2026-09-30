@@ -1,12 +1,14 @@
 # 结婚系统 GUI：独立配置文件；45格箱子布局，每行9个槽位。
 # 修改后 reload 并重新打开生效，不影响已有数据；action 仅限内置动作。
+# R 为返回主菜单按钮，默认第 4 行第 9 格；可调整位置，布局每行必须为 9 字符。
+# 图标使用 MiniMessage 渐变；名称、lore、材质修改后 reload 并重新打开生效，不影响数据。
 {
   "title": "<gradient:#F5ADCD:#B5A4F0>情侣排行榜</gradient>",
   "layout": [
     "DDDDDDDDD",
-    "#DDDDDDD#",
-    "#DDDDDDD#",
-    "#DDDDDDD#",
+    "DDDDDDDDD",
+    "DDDDDDDDD",
+    "DDDDDDDDR",
     "#########"
   ],
   "icons": {
@@ -17,6 +19,19 @@
         "§7嘿嘿嘿～",
         "§7戳我干嘛呀小坏蛋～"
       ],
+      "isEnchant": false,
+      "custom-model-data": 0,
+      "hideFlag": true,
+      "hideEnchant": true
+    },
+    "R": {
+      "name": "<gradient:#F5ADCD:#B5A4F0>返回主菜单</gradient>",
+      "material": "OAK_DOOR",
+      "lore": [
+        "<gray>返回结婚系统主菜单。</gray>",
+        "<gradient:#FFE4A3:#F5ADCD>左键点击返回</gradient>"
+      ],
+      "action": "back",
       "isEnchant": false,
       "custom-model-data": 0,
       "hideFlag": true,

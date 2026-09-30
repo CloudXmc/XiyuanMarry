@@ -1,4 +1,4 @@
-param([ValidatePattern('^[0-9]+[.][0-9]+[.][0-9]+$')][string]$Version = '2.10.0')
+param([ValidatePattern('^[0-9]+[.][0-9]+[.][0-9]+$')][string]$Version = '2.10.43', [switch]$PaperTested, [switch]$FoliaTested, [switch]$VaultTested, [switch]$MySqlTested)
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 Set-Location -LiteralPath $root
@@ -49,16 +49,21 @@ Copy-Item -LiteralPath $jar -Destination $jarOut -Force
 if ((Get-FileHash -LiteralPath $jarOut).Hash -ne (Get-FileHash -LiteralPath $jar).Hash) { throw 'JAR 复制校验失败。' }
 $manifest = [ordered]@{
     version=$Version; generatedAt=(Get-Date -Format o); java=21; paperApi='1.21.11-R0.1-SNAPSHOT'; foliaTarget='1.21.11'
-    build=[ordered]@{success=$true; command='mvn -o clean verify'; log=$log}
+    build=[ordered]@{success=$true; command='mvn clean verify -DskipTests=false'; log=$log}
     tests=$verification.tests
     jar=[ordered]@{path=$jarOut; sizeBytes=(Get-Item -LiteralPath $jarOut).Length; sha256=(Get-FileHash -LiteralPath $jarOut -Algorithm SHA256).Hash; entryCount=$verification.jarEntries; javaClassMajor=$verification.javaClassMajor; externalDependencyClassCount=@($verification.foreignClasses).Count}
     sourceZip=[ordered]@{path=$zip; sizeBytes=(Get-Item -LiteralPath $zip).Length; sha256=(Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash; entryCount=$zipEntryCount; sourceMatchesArchive=$true}
-    runtimeTests=[ordered]@{paper=$false; folia=$false; vault=$false; mysql=$false}
+    runtimeTests=[ordered]@{paper=[bool]$PaperTested; folia=[bool]$FoliaTested; vault=[bool]$VaultTested; mysql=[bool]$MySqlTested}
     verificationReport=(Join-Path $output "verification-$Version.json"); releaseNotes=(Join-Path $root "RELEASE-$Version.md"); auditReport=(Join-Path $root "AUDIT-$Version.md")
-    limitations=@('真实 Paper/Folia/Vault/MySQL 联调及内存压力测试未执行。','启动仍有同步数据库初始化；停服实体属性清理可能被拒绝或取消。','没有跨服多实例分布式协调保证。','断电、离线或停服拒绝调度时，物品补偿及 REVIEW 仍需人工核对。','等级和自定义物品奖励、任务额外奖励、DH/ItemsAdder 尚未完整实现。')
+    limitations=@('真实 Paper/Folia/Vault/MySQL 联调及内存压力测试未执行。','配置文件读取及空闲池销毁仍有同步边界；停服实体属性清理可能被拒绝或取消。','没有跨服多实例分布式协调保证。','断电、离线或停服拒绝调度时，物品补偿及 REVIEW 仍需人工核对。','等级和自定义物品奖励、任务额外奖励、DH/ItemsAdder 尚未完整实现。')
 }
 $manifest | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $output "XiyuanMarry-$Version-manifest.json") -Encoding utf8
 $manifest.jar | ConvertTo-Json
 $manifest.sourceZip | ConvertTo-Json
+
+
+
+
+
 
 

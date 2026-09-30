@@ -8,6 +8,10 @@ public final class PlayerDirectory implements AutoCloseable {
  public PlayerSnapshot capture(Player p){if(closed)return null;var c=config.config();UUID live=p.getUniqueId();String name=p.getName(),key=IdentityResolver.key(c.getString("identity.mode"),c.getBoolean("identity.offline-name-ignore-case",true),live,name);var l=p.getLocation();var snapshot=new PlayerSnapshot(live,IdentityResolver.storageId(key,live),key,name,p.getStatistic(Statistic.PLAY_ONE_MINUTE)/1200L,new PlayerSnapshot.Point(l.getWorld().getUID(),l.getX(),l.getY(),l.getZ(),l.getYaw(),l.getPitch()),System.currentTimeMillis());online.put(live,snapshot);return snapshot;}
  public void join(Player p){if(closed)return;var snap=capture(p);if(snap==null)return;long session=System.nanoTime();sessions.put(snap.liveId(),session);TaskHandle previous=updates.remove(snap.liveId());if(previous!=null)previous.cancel();onJoin.accept(snap);updates.put(snap.liveId(),scheduler.repeatEntity(p,()->{if(!closed&&Objects.equals(sessions.get(snap.liveId()),session))capture(p);},40));}
  public void leave(UUID id){sessions.remove(id);online.remove(id);var t=updates.remove(id);if(t!=null)t.cancel();}
+ /** 只暴露不可变登录令牌；定时快照刷新不会改变令牌，退出/重新登录会使旧请求失效。 */
+ public Long session(UUID liveId){return sessions.get(liveId);}
+ /** 仅供退出清理读取旧身份；快照超时不改变身份，此方法不能用于在线资格或位置判断。 */
+ public UUID lastKnownIdentity(UUID liveId){var snapshot=online.get(liveId);return snapshot==null?null:snapshot.id();}
  public PlayerSnapshot live(UUID id){return fresh(online.get(id));}public PlayerSnapshot identity(UUID id){return online.values().stream().filter(s->s.id().equals(id)&&fresh(s)!=null).findFirst().orElse(null);}
  public PlayerSnapshot name(String name){return online.values().stream().filter(s->s.name().equalsIgnoreCase(name)&&fresh(s)!=null).findFirst().orElse(null);}
  private PlayerSnapshot fresh(PlayerSnapshot s){return s!=null&&System.currentTimeMillis()-s.seenAt()<10000?s:null;}

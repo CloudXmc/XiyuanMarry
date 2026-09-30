@@ -4,9 +4,9 @@
   "title": "<gradient:#F5ADCD:#B5A4F0>请帖管理</gradient>",
   "layout": [
     "DDDDDDDDD",
-    "#DDDDDDD#",
-    "#DDDDDDD#",
-    "#DDDDDDD#",
+    "DDDDDDDDD",
+    "DDDDDDDDD",
+    "DDDDDDDDD",
     "#########"
   ],
   "icons": {
