@@ -13,7 +13,7 @@ public final class CoupleTaskService {
  /** 兼容旧调用的默认时区版本；结婚当天为第1天，按自然日切换。 */
  public static int day(long marriedAt,long now){return day(marriedAt,now,ZoneId.of("Asia/Shanghai"));}
  public static int day(long marriedAt,long now,ZoneId zone){
-  if(zone==null)return 1;
+  if(zone==null)zone=ZoneId.of("Asia/Shanghai");
   long serial=DailyTaskLedger.daySerial(marriedAt,now,zone);
   return (int)Math.floorMod(serial,30)+1;
  }
