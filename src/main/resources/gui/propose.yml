@@ -1,3 +1,4 @@
+# R 为返回主菜单按钮，默认第 5 行第 9 格；可在 45 格布局内移动，action 固定为 back。名称和 lore 支持渐变，修改后 reload 并重新打开生效，不影响已有数据。
 # 结婚系统 GUI：独立配置文件；45格箱子布局，每行9个槽位。
 # 修改后 reload 并重新打开生效，不影响已有数据；action 仅限内置动作。
 {
@@ -7,7 +8,7 @@
     "DDDDDDDDD",
     "DDDDDDDDD",
     "DDDDDDDDD",
-    "#########"
+    "########R"
   ],
   "icons": {
     "#": {
@@ -30,6 +31,19 @@
         "<yellow>左键点击使用</yellow>"
       ],
       "action": "select",
+      "isEnchant": false,
+      "custom-model-data": 0,
+      "hideFlag": true,
+      "hideEnchant": true
+    },
+    "R": {
+      "name": "<gradient:#F5ADCD:#B5A4F0>返回主菜单</gradient>",
+      "material": "OAK_DOOR",
+      "lore": [
+        "<gray>返回结婚系统主菜单。</gray>",
+        "<gradient:#FFE4A3:#F5ADCD>左键点击返回</gradient>"
+      ],
+      "action": "back",
       "isEnchant": false,
       "custom-model-data": 0,
       "hideFlag": true,

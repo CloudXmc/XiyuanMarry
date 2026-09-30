@@ -34,12 +34,13 @@ class GuiAlignmentTest {
     private YamlConfiguration read(String name){return YamlConfiguration.loadConfiguration(Path.of("src/main/resources/gui/"+name+".yml").toFile());}
     @Test void mainMenuKeepsAllNineActionsInThreeAlignedColumns(){
         var layout=GuiLayout.parse(read("main_menu"));
-        assertEquals(List.of("#########","#ACAIAWA#","#ATAUARA#","#AQABAGA#","#########"),layout.rows());
+        assertEquals(List.of("#########","#ACAIAWA#","#ATAUARA#","#AQABAGA#","########X"),layout.rows());
         var actions=new HashSet<String>();for(var row:layout.rows())for(char c:row.toCharArray())if(c!='A'&&c!='#')actions.add(layout.icons().get(c).action());
-        assertEquals(Set.of("info","normal-marriage","wedding-marriage","wedding-plan","task","rank","gifts","tp","received-invitations"),actions);
+        assertEquals(Set.of("info","normal-marriage","wedding-marriage","wedding-plan","task","rank","gifts","tp","received-invitations","back"),actions);
+        assertTrue(layout.icons().get('X').name().contains("返回主菜单"));
     }
     @Test void weddingPreparationUsesCentredGroupsAndPartnerCardUsesCentre(){
-        assertEquals(List.of("#########","#LUVYIAA#","#AAAAAAA#","#GASACAA#","#########"),read("wedding_plan").getStringList("layout"));
+        assertEquals(List.of("#########","#LUVYIAA#","#AAAAAAA#","#GASACAA#","########R"),read("wedding_plan").getStringList("layout"));
         assertEquals(List.of(22),GuiLayout.parse(read("partner_info")).dynamicSlots());
     }
     @Test void everyListUsesFourEqualRowsWithCapacityForThirtyDays(){
@@ -52,7 +53,7 @@ class GuiAlignmentTest {
                 assertEquals(List.of("DDDDDDDDD","DDDDDDDDD","DDDDDDDDD","DDDDDDDDR","#########"),layout.rows(),name);
                 assertEquals(35,layout.dynamicSlots().size());
             }else{
-                assertEquals(List.of("DDDDDDDDD","DDDDDDDDD","DDDDDDDDD","DDDDDDDDD","#########"),layout.rows(),name);
+                assertEquals(List.of("DDDDDDDDD","DDDDDDDDD","DDDDDDDDD","DDDDDDDDD","########R"),layout.rows(),name);
                 assertEquals(36,layout.dynamicSlots().size());
             }
             assertEquals(45,layout.size());

@@ -1,4 +1,5 @@
-# 45 格 GUI：layout 默认 5 行，每行 9 字符；A 为空槽，D 为动态条目，# 为分隔板。icons 定义名称、材质、教学 lore 和内置 action，禁止任意脚本。底部默认 #########。
+# R 为返回主菜单按钮，默认第 5 行第 9 格；可在 45 格布局内移动，action 固定为 back。名称和 lore 支持渐变，修改后 reload 并重新打开生效，不影响已有数据。
+# 45 格 GUI：layout 默认 5 行，每行 9 字符；A 为空槽，D 为动态条目，# 为分隔板。icons 定义名称、材质、教学 lore 和内置 action，禁止任意脚本。底部默认 ########R。
 # sounds 为打开/点击/关闭资源键；volume 范围 (0,4]、默认 1；pitch 范围 (0,2]、默认 1。修改后 reload 并重新打开生效，不影响历史数据。
 {
   "title": "<gradient:#F5ADCD:#B5A4F0>请帖管理</gradient>",
@@ -7,7 +8,7 @@
     "DDDDDDDDD",
     "DDDDDDDDD",
     "DDDDDDDDD",
-    "#########"
+    "########R"
   ],
   "icons": {
     "#": {
@@ -31,6 +32,19 @@
         "<red>拒绝后需要新人重新发送请帖。</red>"
       ],
       "action": "select",
+      "isEnchant": false,
+      "custom-model-data": 0,
+      "hideFlag": true,
+      "hideEnchant": true
+    },
+    "R": {
+      "name": "<gradient:#F5ADCD:#B5A4F0>返回主菜单</gradient>",
+      "material": "OAK_DOOR",
+      "lore": [
+        "<gray>返回结婚系统主菜单。</gray>",
+        "<gradient:#FFE4A3:#F5ADCD>左键点击返回</gradient>"
+      ],
+      "action": "back",
       "isEnchant": false,
       "custom-model-data": 0,
       "hideFlag": true,

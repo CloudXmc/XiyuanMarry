@@ -38,11 +38,9 @@ final class ConfigurationDefaults {
     private static boolean upgradeAlignedMenus(YamlConfiguration target,YamlConfiguration defaults,String resource){
         if(!resource.startsWith("gui/")||defaults.getStringList("layout").isEmpty())return false;
         // 服主预留的同名图标不能因升级布局而被意外激活。
-        if(resource.equals("gui/rank.yml")&&target.contains("icons.R")){
-            var existing=target.getConfigurationSection("icons.R");
-            var expected=defaults.getConfigurationSection("icons.R");
-            if(existing==null||expected==null||!existing.getValues(true).equals(expected.getValues(true)))return false;
-        }
+        String returnKey=resource.equals("gui/main_menu.yml") ? "X" : "R";
+        if(target.contains("icons."+returnKey)
+                && !"back".equals(target.getString("icons."+returnKey+".action"))) return false;
         var previous=switch(resource){
             case "gui/main_menu.yml"->List.of("#########","#IATARAB#","#ACQAAWA#","#AAGAUAA#","#########");
             case "gui/wedding_plan.yml"->List.of("#########","#LAIAGAA#","#AAASACA#","#AAAAAAA#","#########");
@@ -54,6 +52,15 @@ final class ConfigurationDefaults {
         // 只迁移已发布的默认排列；不改图标、动作、标题和服主自定义布局。
         var replacement=defaults.getStringList("layout");
         var current=target.getStringList("layout");
+        // 2.10.44 及此前的规整默认布局仍需补上返回入口，只替换整组匹配的布局。
+        var alignedWithoutReturn=switch(resource){
+            case "gui/main_menu.yml"->List.of("#########","#ACAIAWA#","#ATAUARA#","#AQABAGA#","#########");
+            case "gui/wedding_plan.yml"->List.of("#########","#LUVYIAA#","#AAAAAAA#","#GASACAA#","#########");
+            case "gui/partner_info.yml"->List.of("#########","#AAAAAAA#","#AAADAAA#","#AAAAAAA#","#########");
+            case "gui/propose.yml","gui/send_invite.yml","gui/invitation.yml","gui/gift.yml"
+                    ->List.of("DDDDDDDDD","DDDDDDDDD","DDDDDDDDD","DDDDDDDDD","#########");
+            default->List.<String>of();
+        };
         // 2.8.3 的导航栏被旧迁移移除后只剩 21 个 D，仍需继续升级到当前列表布局。
         boolean legacyList=previous.contains("DDDDDDDDD")&&current.equals(
                 List.of("#########","#DDDDDDD#","#DDDDDDD#","#DDDDDDD#","#########"));
@@ -67,7 +74,7 @@ final class ConfigurationDefaults {
                 List.of("DDDDDDDDD","DDDDDDDDD","DDDDDDDDD","DDDDDDDDH","#########"));
         boolean rankWithoutReturn=resource.equals("gui/rank.yml")&&current.equals(
                 List.of("DDDDDDDDD","DDDDDDDDD","DDDDDDDDD","DDDDDDDDD","#########"));
-        if(!previous.isEmpty()&&(current.equals(previous)||legacyList||mixedList||fullTaskList||taskPeriodFirst||taskWithoutReturn||rankWithoutReturn)&&!current.equals(replacement)){
+        if(!previous.isEmpty()&&(current.equals(previous)||current.equals(alignedWithoutReturn)||legacyList||mixedList||fullTaskList||taskPeriodFirst||taskWithoutReturn||rankWithoutReturn)&&!current.equals(replacement)){
             target.set("layout",replacement);return true;
         }
         return false;

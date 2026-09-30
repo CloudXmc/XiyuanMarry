@@ -16,9 +16,12 @@ class ResourceYamlTest {
             List<String> layout=yaml.getStringList("layout");
             assertEquals(5,layout.size(),name);
             for(String row:layout)assertEquals(9,row.length(),name+" row width");
-            if(name.equals("task.yml")) assertEquals("########R",layout.getLast(),name+" bottom row with return button");
+            if(List.of("propose.yml","send_invite.yml","invitation.yml","gift.yml","partner_info.yml","wedding_plan.yml","task.yml").contains(name))
+                assertEquals("########R",layout.getLast(),name+" bottom row with return button");
+            else if(name.equals("main_menu.yml")) assertEquals("########X",layout.getLast(),name+" bottom return button");
             else assertEquals("#########",layout.getLast(),name+" fixed bottom separator row");
             assertNotNull(yaml.getConfigurationSection("icons"));
+            assertEquals("back",yaml.getString(name.equals("main_menu.yml")?"icons.X.action":"icons.R.action"),name+" return action");
             assertFalse(yaml.getConfigurationSection("icons").contains("P"),name);
             assertFalse(yaml.getConfigurationSection("icons").contains("N"),name);
             assertFalse(yaml.getConfigurationSection("icons").contains("F"),name);

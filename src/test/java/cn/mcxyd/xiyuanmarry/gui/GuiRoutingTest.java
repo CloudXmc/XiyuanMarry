@@ -58,4 +58,17 @@ class GuiRoutingTest {
         gui.activate(player,task,new XiyuanHolder.Action("back","/mc"));
         verify(gui).open(player,"main_menu","",0);
     }
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings={"main_menu","propose","wedding_plan","partner_info","invitation","send_invite","gift","task","rank"})
+    void visibleReturnActionRoutesEveryPageToMainMenu(String name){
+        var yaml=org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(java.nio.file.Path.of("src/main/resources/gui/"+name+".yml").toFile());
+        var layout=GuiLayout.parse(yaml);
+        var symbol=layout.rows().stream().flatMapToInt(String::chars)
+                .filter(c -> c!='A' && "back".equals(layout.icons().get((char)c).action())).findFirst().orElseThrow();
+        var icon=layout.icons().get((char)symbol);
+        var page=new XiyuanHolder(UUID.randomUUID(),generation,name,"",0,Map.of());
+        gui.activate(player,page,new XiyuanHolder.Action(icon.action(),icon.returnCommand()));
+        verify(gui).open(player,"main_menu","",0);
+        verify(player,never()).performCommand(anyString());
+    }
 }
