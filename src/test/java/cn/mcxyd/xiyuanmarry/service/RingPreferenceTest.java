@@ -20,6 +20,7 @@ class RingPreferenceTest {
     final PlayerDirectory directory = mock(PlayerDirectory.class);
     final MarriageService marriages = mock(MarriageService.class);
     final UUID live = UUID.randomUUID();
+    final UUID generation = UUID.randomUUID();
     final PlayerSnapshot actor = new PlayerSnapshot(live, live, "name:guest", "Guest", 60, null, 1);
     final List<Function<MarriageRepository, Object>> submitted = new ArrayList<>();
     Runnable tick;
@@ -34,8 +35,9 @@ class RingPreferenceTest {
         when(scheduler.runRepeatingAsync(any(), anyLong(), anyLong(), any()))
                 .thenAnswer(call -> { tick = call.getArgument(0); return mock(TaskHandle.class); });
         // 开关偏好走四参数 submit；记录工作闭包后手动执行，避免真实数据库。
-        doAnswer(call -> { submitted.add(call.getArgument(1)); return null; })
-                .when(marriages).submit(any(), any(), any(), any());
+        when(marriages.databaseGeneration()).thenReturn(generation);
+        doAnswer(call -> { submitted.add(call.getArgument(2)); return null; })
+                .when(marriages).submitAtGeneration(any(), any(), any(), any(), any());
         rings = new RingService(plugin, marriages, mock(ConfigurationManager.class), directory, scheduler, mock(MessageService.class));
     }
 
@@ -55,5 +57,18 @@ class RingPreferenceTest {
         tick.run();
         // 偏好若被 tick 按在线集合清除，会退回默认开启，第二次开关将变成 false。
         assertTrue(rings.toggle(actor), "退出后偏好必须保留，不能静默恢复默认开启");
+    }
+
+    @Test void firstTogglePersistsBeforeLoginProfileCommit() {
+        when(marriages.view()).thenReturn(new MarriageService.View(Map.of(), Map.of(), List.of(), Map.of()));
+        assertFalse(rings.toggle(actor), "首次关闭应返回 false");
+        var repository = mock(MarriageRepository.class);
+        submitted.getLast().apply(repository);
+        verify(repository).put(RingService.PREF_BUCKET, live.toString(), "off");
+    }
+
+    @Test void preferenceWriteIsBoundToTheDatabaseGenerationAtToggleTime() {
+        rings.toggle(actor);
+        verify(marriages).submitAtGeneration(isNull(), eq(generation), any(), any(), any());
     }
 }

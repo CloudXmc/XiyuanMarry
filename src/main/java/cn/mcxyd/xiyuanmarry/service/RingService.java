@@ -37,6 +37,7 @@ public final class RingService implements AutoCloseable {
     private final MessageService messages;
     private final ConcurrentHashMap<UUID, Boolean> enabled = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<UUID, UUID> pending = new ConcurrentHashMap<>();
+    private volatile UUID preferenceGeneration;
     private volatile TaskHandle task;
     private volatile boolean closed;
 
@@ -54,45 +55,62 @@ public final class RingService implements AutoCloseable {
     public synchronized void start() {
         if(closed||task!=null)return;
         task = scheduler.runRepeatingAsync(this::tick, 1, 2, TimeUnit.SECONDS);
-        loadPreferences();
+        UUID generation = marriages.databaseGeneration();
+        preferenceGeneration = generation;
+        loadPreferences(generation);
     }
 
     /** 开关偏好按持久身份入库，首次激活时回填内存缓存；损坏键忽略并保持默认开启。 */
-    private void loadPreferences() {
+    private void loadPreferences(UUID generation) {
         if(closed)return;
-        marriages.submit(null, r -> r.entries(PREF_BUCKET), prefs -> {
-            if(closed)return;
+        marriages.submitAtGeneration(null, generation, r -> r.entries(PREF_BUCKET), prefs -> {
+            // 旧数据库的异步回调不能污染切库后的内存开关状态。
+            if(closed || !generation.equals(preferenceGeneration) || !isCurrentGeneration(generation))return;
             for(var entry : prefs.entrySet()) try {
                 // putIfAbsent：加载是异步的，玩家在加载完成前的操作必须胜过库里的旧值。
                 enabled.putIfAbsent(UUID.fromString(entry.getKey()), !"off".equals(entry.getValue()));
             } catch(RuntimeException invalid) {
                 config.warn("戒指开关偏好键无效，已忽略：" + entry.getKey());
             }
-        }, error -> {}, () -> {});
+        }, error -> {});
+    }
+
+    private boolean isCurrentGeneration(UUID generation) {
+        try { return generation.equals(marriages.databaseGeneration()); }
+        catch (RuntimeException unavailable) { return false; }
     }
 
     public boolean toggle(PlayerSnapshot actor) {
         if(closed)return false;
         boolean next = !enabled.getOrDefault(actor.id(), true);
         enabled.put(actor.id(), next);
-        persistPreference(actor.id(), next);
+        UUID generation;
+        try { generation = marriages.databaseGeneration(); }
+        catch (RuntimeException unavailable) { return next; }
+        persistPreference(actor.id(), next, generation);
         marriages.notifyLive(actor.liveId(), "ring-toggle", "state", messages.raw(next ? "on" : "off"));
         return next;
     }
 
-    private void persistPreference(UUID identity, boolean on) {
-        marriages.submit(null, r -> {
-            // 重新确认身份仍存在，避免删除资料后的迟到开关重新写回偏好。
-            if(!marriages.view().profiles().containsKey(identity))return null;
+    private void persistPreference(UUID identity, boolean on, UUID generation) {
+        marriages.submitAtGeneration(null, generation, r -> {
+            // 代次校验在入队和取连接时完成，迟到请求不会写入替换后的数据库。
             r.put(PREF_BUCKET, identity.toString(), on ? "on" : "off");
             return null;
-        }, x -> {}, error -> config.warn("戒指开关偏好写入失败，本次仅内存生效：" + error));
+        }, x -> {}, error -> {
+            if(!(error instanceof cn.mcxyd.xiyuanmarry.repository.DatabaseManager.StaleGenerationException))
+                config.warn("戒指开关偏好写入失败，本次仅内存生效：" + error);
+        });
     }
 
     public void reload() {
-        // 切库或重载后重新读取该库的偏好；内存缓存只保留仍有资料的玩家。
-        enabled.keySet().retainAll(marriages.view().profiles().keySet());
-        loadPreferences();
+        // 切库后清空旧代次偏好；同库 reload 保留内存操作，避免覆盖尚未完成的玩家切换。
+        UUID generation = marriages.databaseGeneration();
+        if(!generation.equals(preferenceGeneration)) {
+            preferenceGeneration = generation;
+            enabled.clear();
+        }
+        loadPreferences(generation);
     }
 
     public void give(CommandSender sender, UUID target, String rawType) {
@@ -201,6 +219,7 @@ public final class RingService implements AutoCloseable {
     @Override public synchronized void close() {
         closed = true;
         if (task != null) task.cancel();
+        preferenceGeneration = null;
         enabled.clear();
         pending.clear();
     }
