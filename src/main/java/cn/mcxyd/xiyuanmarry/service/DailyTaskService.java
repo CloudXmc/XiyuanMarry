@@ -38,8 +38,9 @@ public final class DailyTaskService implements AutoCloseable {
         long now = System.currentTimeMillis();
         if (!fresh(actor, now) || !fresh(partner, now)
                 || !CoupleTaskService.partnersNear(actor.point(), partner.point(), settings.tasks().distance())) return;
-        var definition = settings.tasks().forDay(DailyTaskLedger.daySerial(marriage.marriedAt(), actor.seenAt(), zone));
-        if (!pending.offer(new Observation(actor.id(), marriage.id(), actor.seenAt(), definition,
+        // 任务边界以事件发生时刻判断；快照可能在午夜前采样，不能把午夜后的行为记入旧日期。
+        var definition = settings.tasks().forDay(DailyTaskLedger.daySerial(marriage.marriedAt(), now, zone));
+        if (!pending.offer(new Observation(actor.id(), marriage.id(), now, definition,
                 new CoupleTaskService.Event(type, value, amount), zone, settings.generation(), epoch, database)))
             marriages.notifyLive(actor.liveId(), "task-busy");
     }

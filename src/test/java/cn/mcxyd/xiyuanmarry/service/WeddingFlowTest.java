@@ -109,6 +109,14 @@ class WeddingFlowTest {
         verify(messages).send(livePlayers.get(a),"wedding-location-required");
         assertEquals(point,database.use(r->weddings.plan(r,record().id()).points().get("location")));
     }
+    @Test void queuedWeddingPointCannotApplyAfterPlayerReconnect() {
+        var replacement = new PlayerSnapshot.Point(point.world(),99,70,99,0,0);
+        weddings.setPoint(new PlayerSnapshot(a,a,"name:Alice","Alice",60,replacement,System.currentTimeMillis()),"location");
+        when(directory.session(a)).thenReturn(2L);
+        drainIo(); drainOwners();
+        assertEquals(point,database.use(r->weddings.plan(r,record().id()).points().get("location")));
+        verify(messages).send(livePlayers.get(a),"relationship-request-stale");
+    }
     @Test void staleWeddingEntryPointsIgnoreNullSnapshots() {
         assertDoesNotThrow(() -> {
             weddings.respond(null,true);

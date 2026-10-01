@@ -4,6 +4,7 @@ import cn.mcxyd.xiyuanmarry.config.*;
 import cn.mcxyd.xiyuanmarry.message.MessageService;
 import cn.mcxyd.xiyuanmarry.model.DailyTask;
 import cn.mcxyd.xiyuanmarry.service.MarriageService;
+import cn.mcxyd.xiyuanmarry.service.MonsterTaskRandomizer;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.TextDecoration;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
@@ -27,7 +28,9 @@ class TaskIconRenderingTest {
         when(config.snapshot()).thenReturn(new ConfigurationManager.Snapshot(UUID.randomUUID(),Map.of(),Map.of(),null,catalogue));
         var service=new MessageService(config);
         var provider=new MenuContentProvider(config,mock(MarriageService.class),service);
-        var entries=provider.tasks(new DailyTask("couple",0,catalogue.schedule().getFirst(),0,false));
+        var today = new DailyTask("couple",0,
+                MonsterTaskRandomizer.resolve(catalogue.schedule().getFirst(),"couple",0),0,false);
+        var entries=provider.tasks(today);
         var layout=GuiLayout.parse(YamlConfiguration.loadConfiguration(Path.of("src/main/resources/gui/task.yml").toFile()));
         assertEquals(30,entries.size());assertTrue(layout.dynamicSlots().size()>=entries.size());
         var meta=mock(ItemMeta.class);var icons=new IconFactory(service.renderer());
@@ -38,7 +41,8 @@ class TaskIconRenderingTest {
         var names=ArgumentCaptor.forClass(Component.class);verify(meta,times(30)).displayName(names.capture());
         for(int day=0;day<30;day++){
             var name=names.getAllValues().get(day);
-            assertEquals("第1轮 · 第"+(day+1)+"天 · "+catalogue.schedule().get(day).name(),PlainTextComponentSerializer.plainText().serialize(name));
+            var expected = MonsterTaskRandomizer.resolve(catalogue.schedule().get(day),"couple",day);
+            assertEquals("第1轮 · 第"+(day+1)+"天 · "+expected.name(),PlainTextComponentSerializer.plainText().serialize(name));
             notItalic(name);
         }
     }

@@ -35,7 +35,7 @@ public final class WeddingInvitationService {
         return List.copyOf(result);
     }
     public void respond(PlayerSnapshot guest,String selected,boolean accept) {
-        marriages.submit(guest.liveId(),repository->{
+        marriages.submitPlayer(guest,repository->{
             var candidates=pending(repository,guest.id()).stream()
                     .filter(invitation->selected==null||selected.equals(invitation.weddingId())).toList();
             require(!candidates.isEmpty(),"request-missing");

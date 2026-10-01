@@ -1,6 +1,9 @@
 package cn.mcxyd.xiyuanmarry.config;
 import org.bukkit.configuration.file.YamlConfiguration;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 
 /** 默认节点与注释补全。 */
 final class ConfigurationDefaults {
@@ -10,6 +13,7 @@ final class ConfigurationDefaults {
         changed |= upgradeGuiTo45Slots(target, resource);
         changed |= upgradeInboxMenus(target,defaults,resource);
         changed |= upgradeAlignedMenus(target,defaults,resource);
+        changed |= upgradeTaskDefaults(target, defaults, resource);
         if(resource.equals("messages.yml")&&defaults.contains("teleport-cooldown")
                 &&"<yellow>传送冷却中，请稍后再试。</yellow>".equals(target.getString("teleport-cooldown"))){
             target.set("teleport-cooldown",defaults.getString("teleport-cooldown"));changed=true;
@@ -33,6 +37,35 @@ final class ConfigurationDefaults {
             }
         }
         return changed;
+    }
+
+    private static boolean upgradeTaskDefaults(YamlConfiguration target, YamlConfiguration defaults, String resource) {
+        if (!resource.equals("tasks.yml")) return false;
+        Map<?, ?> shipped = defaults.getMapList("tasks").stream()
+                .filter(row -> "kill-specific".equals(Objects.toString(row.get("id"), "")))
+                .findFirst().orElse(null);
+        if (shipped == null) return false;
+        var rows = new ArrayList<>(target.getMapList("tasks"));
+        boolean changed = false;
+        for (int i = 0; i < rows.size(); i++) {
+            var row = rows.get(i);
+            if (!"kill-specific".equals(Objects.toString(row.get("id"), ""))
+                    || row.containsKey("value")
+                    || !"共同击杀指定怪物".equals(Objects.toString(row.get("name"), ""))
+                    || integer(row.get("target"), -1) != 3) continue;
+            var replacement = new java.util.LinkedHashMap<String, Object>();
+            for (var entry : row.entrySet()) replacement.put(Objects.toString(entry.getKey()), entry.getValue());
+            replacement.put("value", shipped.get("value"));
+            replacement.put("name", shipped.get("name"));
+            rows.set(i, replacement);
+            changed = true;
+        }
+        if (changed) target.set("tasks", rows);
+        return changed;
+    }
+
+    private static long integer(Object value, long fallback) {
+        return value instanceof Number number ? number.longValue() : fallback;
     }
 
     private static boolean upgradeAlignedMenus(YamlConfiguration target,YamlConfiguration defaults,String resource){

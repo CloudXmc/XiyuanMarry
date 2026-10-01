@@ -40,6 +40,14 @@ class DailyTaskCycleCoverageTest {
         assertEquals(30,DailyTaskLedger.daySerial(married,ZonedDateTime.of(2026,10,29,0,0,0,0,zone).toInstant().toEpochMilli(),zone));
         assertEquals(0,DailyTaskLedger.daySerial(married,married-1));
     }
+    @Test void septemberTwentiethTaskExpiresAtSeptemberTwentyFirstMidnight() {
+        ZoneId zone=ZoneId.of("Asia/Shanghai");
+        long married=ZonedDateTime.of(2026,9,20,10,0,0,0,zone).toInstant().toEpochMilli();
+        long beforeMidnight=ZonedDateTime.of(2026,9,20,23,59,59,999_000_000,zone).toInstant().toEpochMilli();
+        long atMidnight=ZonedDateTime.of(2026,9,21,0,0,0,0,zone).toInstant().toEpochMilli();
+        assertEquals(0,DailyTaskLedger.daySerial(married,beforeMidnight,zone));
+        assertEquals(1,DailyTaskLedger.daySerial(married,atMidnight,zone));
+    }
     @Test void assignedDefinitionAndRewardStayStableAfterConfigChanges() {
         try(var r=new SqliteMarriageRepository(root.resolve("reload.db"))) {
             r.createMarriage(one,two,"NORMAL",1000);var marriage=r.findByPlayer(one);

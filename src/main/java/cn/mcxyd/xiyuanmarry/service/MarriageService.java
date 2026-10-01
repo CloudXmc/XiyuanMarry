@@ -37,6 +37,18 @@ public final class MarriageService {
  }
  public <T>void submit(UUID actor,Function<MarriageRepository,T> work,Consumer<T> committed){submit(actor,work,committed,error->{});}
  public <T>void submit(UUID actor,Function<MarriageRepository,T> work,Consumer<T> committed,Consumer<Throwable> failed){submitAtGeneration(actor,null,work,committed,failed,()->{});}
+ /** 玩家发起的普通业务提交绑定当前登录会话、配置代次和数据库代次，旧点击不能写入新会话或新库。 */
+ public <T>void submitPlayer(PlayerSnapshot participant,Function<MarriageRepository,T> work,Consumer<T> committed){
+  if(participant==null)return;
+  UUID expectedConfig=config.snapshot().generation(), expectedDatabase=database.generation();
+  Long expectedSession=directory.session(participant.liveId());
+  submitAtGeneration(participant.liveId(),expectedDatabase,r->{
+   require(expectedConfig.equals(config.snapshot().generation()),"relationship-request-stale");
+   require(expectedSession!=null&&expectedSession.equals(directory.session(participant.liveId())),"relationship-request-stale");
+   currentIdentity(participant);
+   return work.apply(r);
+  },committed,error->{});
+ }
  public <T>void submit(UUID actor,Function<MarriageRepository,T> work,Consumer<T> committed,Consumer<Throwable> failed,Runnable afterCommit){submitAtGeneration(actor,null,work,committed,failed,afterCommit);}
  public <T>void submitAtGeneration(UUID actor,UUID expectedGeneration,Function<MarriageRepository,T> work,Consumer<T> committed,Consumer<Throwable> failed){submitAtGeneration(actor,expectedGeneration,work,committed,failed,()->{});}
  /** afterCommit 只做纯内存提交标记；必须早于缓存刷新、租约释放和可能跳过的玩家通知。 */
@@ -155,6 +167,15 @@ public final class MarriageService {
   if(first.onlineMinutes()<minimum||second.onlineMinutes()<minimum)throw new RuleViolation("minimum-online","minutes",minimum);
   require(r.get("blocks",b.id()+":"+a.id())==null,"blocked");
  }
+ private void eligibleOfflineProposer(MarriageRepository r,UUID proposer,PlayerSnapshot target){
+  require(proposer!=null&&target!=null,"offline");require(!proposer.equals(target.id()),"self-proposal");
+  require(r.findByPlayer(proposer)==null&&r.findByPlayer(target.id())==null,"already-married");
+  long now=System.currentTimeMillis();
+  require(number(r,"cooldowns",proposer.toString())<=now&&number(r,"cooldowns",target.id().toString())<=now,"cooldown");
+  long minimum=setting("marriage.minimum-online-minutes",30);
+  if(target.onlineMinutes()<minimum)throw new RuleViolation("minimum-online","minutes",minimum);
+  require(r.get("blocks",target.id()+":"+proposer)==null,"blocked");
+ }
  public void propose(PlayerSnapshot a,PlayerSnapshot b,String mode){
   if(a==null||b==null)return;
   submitProposalRequest(a,List.of(a,b),r->{maintain(r,System.currentTimeMillis());require("NORMAL".equals(mode)||"WEDDING".equals(mode),"invalid-argument");eligible(r,a,b);
@@ -167,10 +188,16 @@ public final class MarriageService {
   submitProposalRequest(target,List.of(target),r->{
    maintain(r,System.currentTimeMillis());String key=target.id().toString(),raw=r.get("proposals",key);
    require(raw!=null,"request-missing");var q=readProposal(key,raw);require(q!=null,"request-missing");
-   var first=directory.identity(q.proposer());eligible(r,first,target);
-   // 求婚方的退出清理可能排在接受之后；新登录不能复用接受提交前的旧同意。
-   Long proposerSession=directory.session(first.liveId());
-   require(proposerSession!=null&&proposerSession-requestedAt<=0,"marriage-request-stale");
+    var first=directory.identity(q.proposer());
+    if(first!=null){
+     eligible(r,first,target);
+     // 求婚方的退出清理可能排在接受之后；新登录不能复用接受提交前的旧同意。
+     Long proposerSession=directory.session(first.liveId());
+     require(proposerSession!=null&&proposerSession-requestedAt<=0,"marriage-request-stale");
+    }else{
+     // 求婚已持久化，求婚方可以在有效期内离线；仍在事务中重验关系、冷却、屏蔽和收件方在线时长。
+     eligibleOfflineProposer(r,q.proposer(),target);
+    }
    require(q.expiresAt()>System.currentTimeMillis(),"request-missing");boolean normal=q.type().equals("NORMAL");
    require(normal?r.createMarriage(q.proposer(),q.target(),q.type(),System.currentTimeMillis())
        :r.createEngagement(q.proposer(),q.target(),q.type(),System.currentTimeMillis()),"already-married");
@@ -245,7 +272,11 @@ public final class MarriageService {
  private void end(MarriageRepository r,MarriageRecord m,long now){long until=now+setting("marriage.remarriage-cooling-hours",24)*3600000;r.put("cooldowns",m.playerOne().toString(),Long.toString(until));r.put("cooldowns",m.playerTwo().toString(),Long.toString(until));r.deleteMarriage(m.playerOne());r.remove("weddings",m.id());}
  private void maintain(MarriageRepository r,long now){for(var m:r.findAll()){if(m.state()==MarriageState.ENGAGED&&m.createdAt()+setting("marriage.engagement-hours",48)*3600000<=now){r.deleteMarriage(m.playerOne());r.remove("weddings",m.id());}else if(m.state()==MarriageState.DIVORCE_PENDING&&m.divorceAt()<=now)end(r,m,m.divorceAt());}for(var e:r.entries("proposals").entrySet()){var p=readProposal(e.getKey(),e.getValue());if(p!=null&&p.expiresAt()<=now)r.remove("proposals",e.getKey());}for(var e:r.entries("cooldowns").entrySet()){Long expiry=readLong("cooldowns",e.getKey(),e.getValue());if(expiry!=null&&expiry<=now)r.remove("cooldowns",e.getKey());}String cutoff=today().minusDays(7).toString();for(String k:r.entries("daily").keySet())if(k.compareTo(cutoff)<0)r.remove("daily",k);}
  public static long number(MarriageRepository r,String bucket,String key){String v=r.get(bucket,key);if(v==null)return 0;try{return Long.parseLong(v);}catch(NumberFormatException invalid){return Long.MAX_VALUE;}}
- public void leave(UUID live,UUID id){busy.remove(live);if(!ready())return;submitAtGeneration(null,database.generation(),r->{for(var e:r.entries("proposals").entrySet()){var q=readProposal(e.getKey(),e.getValue());if(q!=null&&(q.proposer().equals(id)||q.target().equals(id)))r.remove("proposals",e.getKey());}return null;},x->{},error->{});}
+ /**
+  * 退出只撤销玩家操作门闩，不删除求婚记录。求婚有效期是持久化状态，
+  * 这样收件方可以在求婚方离线时接受；过期记录由 maintain 统一清理。
+  */
+ public void leave(UUID live,UUID id){busy.remove(live);}
  private Proposal readProposal(String key,String raw){try{Proposal p=gson.fromJson(raw,Proposal.class);if(p==null||p.id()==null||p.proposer()==null||p.target()==null||p.type()==null||p.type().isBlank()||p.expiresAt()<=0
    ||!p.target().toString().equalsIgnoreCase(key)||p.proposer().equals(p.target())||!Set.of("NORMAL","WEDDING").contains(p.type()))throw new IllegalArgumentException("求婚记录字段不一致");return p;}catch(RuntimeException invalid){warnMetadata("proposals",key);return null;}}
  private Long readLong(String bucket,String key,String raw){try{return Long.valueOf(raw);}catch(RuntimeException invalid){warnMetadata(bucket,key);return null;}}

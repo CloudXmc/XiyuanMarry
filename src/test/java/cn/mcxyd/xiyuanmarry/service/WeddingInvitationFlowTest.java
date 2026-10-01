@@ -26,7 +26,7 @@ class WeddingInvitationFlowTest {
         when(marriages.json()).thenReturn(json);
         when(marriages.setting("marriage.engagement-hours",48)).thenReturn(48L);
         doAnswer(call->{Function<MarriageRepository,Object> work=call.getArgument(1);Consumer<Object> done=call.getArgument(2);done.accept(repository.transaction(work));return null;})
-                .when(marriages).submit(any(),any(),any());
+                .when(marriages).submitPlayer(any(),any(),any());
         weddings=new WeddingService(marriages,mock(ConfigurationManager.class),mock(UnifiedScheduler.class));
     }
     @AfterEach void close(){weddings.clear();repository.close();}

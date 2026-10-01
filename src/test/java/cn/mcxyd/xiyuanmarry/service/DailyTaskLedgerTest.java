@@ -88,4 +88,14 @@ class DailyTaskLedgerTest {
             assertEquals(0,r.findByPlayer(one).bond());
         }
     }
+    @Test void randomMonsterTargetIsPersistedForTheCoupleDay(){
+        var definition=new TaskDefinition("specific","KILL_SPECIFIC","共同击杀指定怪物：{monster}",MonsterTaskRandomizer.RANDOM_COMMON_MONSTER,3,20);
+        try(var r=new SqliteMarriageRepository(dir.resolve("random-monster.db"))){
+            r.createMarriage(one,two,"NORMAL",1000);var marriage=r.findByPlayer(one);
+            var first=ledger.current(r,marriage,2000,definition);
+            var second=ledger.current(r,marriage,3000,definition);
+            assertNotNull(first);assertEquals(first.definition(),second.definition());
+            assertTrue(MonsterTaskRandomizer.COMMON_MONSTERS.contains(first.definition().selector()));
+        }
+    }
 }

@@ -41,7 +41,8 @@ public final class DailyTaskLedger {
         if (saved != null && saved.definition().type().equals("BIOME") && biomeNames(repository, saved) == null) return null;
         // 已分配任务保留定义快照；热重载或时钟回拨不得重置进度、重复给奖。
         if (saved != null && saved.daySerial() >= day) return saved;
-        DailyTask created = new DailyTask(marriage.id(), day, definition, 0, false);
+        TaskDefinition selected = MonsterTaskRandomizer.resolve(definition, marriage.id(), day);
+        DailyTask created = new DailyTask(marriage.id(), day, selected, 0, false);
         if (definition.type().equals("BIOME") && biomeNames(repository, created) == null) return null;
         repository.put(BUCKET, marriage.id(), json.toJson(created));
         return created;

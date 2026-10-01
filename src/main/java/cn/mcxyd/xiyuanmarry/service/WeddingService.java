@@ -66,7 +66,7 @@ public final class WeddingService implements AutoCloseable {
             return;
         }
         require(Set.of("location","nx","nl","ly").contains(role)||validSeat(role),"invalid-argument");
-        marriages.submit(actor.liveId(),r->{
+        marriages.submitPlayer(actor,r->{
             var m=engagement(r,actor.id()); require(!active.containsKey(m.id()),"wedding-running");
             save(r,m.id(),plan(r,m.id()).point(role,actor.point())); return null;
         },x->marriages.notifyLive(actor.liveId(),"wedding-point-set","role",role));
@@ -80,7 +80,7 @@ public final class WeddingService implements AutoCloseable {
     public void invite(PlayerSnapshot actor,PlayerSnapshot guest) {
         if(actor==null)return;
         require(guest!=null,"offline");
-        marriages.submit(actor.liveId(),r->{
+        marriages.submitPlayer(actor,r->{
             var m=engagement(r,actor.id()); require(!m.contains(guest.id()),"invalid-argument");
             require(!active.containsKey(m.id()),"wedding-running");
             var current=plan(r,m.id());

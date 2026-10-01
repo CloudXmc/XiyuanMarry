@@ -136,23 +136,61 @@ class NormalMarriageFlowTest {
         assertNull(database.use(r->r.get("proposals",b.id().toString())));
         assertTrue(database.<Boolean>use(r->r.entries("weddings").isEmpty()));
     }
-    @Test void unchangedLogoutCleanupRemovesOnlyRelatedProposal(){
+
+    @Test void offlineProposerCanStillBeAcceptedWithinProposalExpiry(){
+        marriages.propose(a,b,"NORMAL");
+        drain();
+        directory.leave(a.liveId());
+        marriages.accept(b);
+        drain();
+        var married=database.use(r->r.findByPlayer(b.id()));
+        assertNotNull(married);
+        assertEquals(MarriageState.MARRIED,married.state());
+        assertEquals("NORMAL",married.type());
+        assertNull(database.use(r->r.get("proposals",b.id().toString())));
+    }
+    @Test void realQuitEventKeepsProposalForOfflineAcceptance(){
+        marriages.propose(a,b,"NORMAL");
+        drain();
+        new PlayerLifecycleListener(directory,mock(WeddingService.class),marriages,mock(BondAttributeService.class))
+            .quit(new PlayerQuitEvent(alice,"quit"));
+        drain();
+        marriages.accept(b);
+        drain();
+        assertEquals(MarriageState.MARRIED,database.use(r->r.findByPlayer(b.id()).state()));
+        assertNull(database.use(r->r.get("proposals",b.id().toString())));
+    }
+    @Test void realQuitEventKeepsWeddingProposalForOfflineAcceptance(){
+        marriages.propose(a,b,"WEDDING");
+        drain();
+        new PlayerLifecycleListener(directory,mock(WeddingService.class),marriages,mock(BondAttributeService.class))
+            .quit(new PlayerQuitEvent(alice,"quit"));
+        drain();
+        marriages.accept(b);
+        drain();
+        var engaged=database.use(r->r.findByPlayer(b.id()));
+        assertNotNull(engaged);
+        assertEquals(MarriageState.ENGAGED,engaged.state());
+        assertEquals("WEDDING",engaged.type());
+        assertNull(database.use(r->r.get("proposals",b.id().toString())));
+    }
+    @Test void logoutKeepsPendingProposalUntilItExpires(){
         seed();var carol=directory.live(player("Carol").getUniqueId());var dan=directory.live(player("Dan").getUniqueId());
         String other=marriages.json().toJson(new Proposal(UUID.randomUUID(),carol.id(),dan.id(),"NORMAL",System.currentTimeMillis()+60_000));
         database.use(r->{r.put("proposals",dan.id().toString(),other);return null;});
         marriages.leave(a.liveId(),a.id());drain();
-        assertNull(database.use(r->r.get("proposals",b.id().toString())));
+        assertEquals(proposal,database.use(r->r.get("proposals",b.id().toString())));
         assertEquals(other,database.use(r->r.get("proposals",dan.id().toString())));
     }
-    @Test void queuedLogoutCleanupCannotDeleteProposalCreatedAfterReconnect(){
+    @Test void reconnectCannotOverwriteExistingPendingProposal(){
         seed();var carol=directory.live(player("Carol").getUniqueId());
         marriages.leave(a.liveId(),a.id());
         directory.leave(a.liveId());directory.join(alice);
         var refreshed=directory.live(a.liveId());
         marriages.propose(refreshed,carol,"NORMAL");
         drain();
-        assertNull(database.use(r->r.get("proposals",b.id().toString())));
-        assertNotNull(database.use(r->r.get("proposals",carol.id().toString())));
+        assertEquals(proposal,database.use(r->r.get("proposals",b.id().toString())));
+        assertNull(database.use(r->r.get("proposals",carol.id().toString())));
     }
     @Test void queuedBlockCannotWriteReplacementDatabase(){
         marriages.block(a,b.id(),true);
@@ -214,7 +252,7 @@ class NormalMarriageFlowTest {
         seed();assertNotEquals(a.id(),a.liveId());assertTrue(marriages.view().profiles().isEmpty());
         new PlayerLifecycleListener(directory,mock(WeddingService.class),marriages,mock(BondAttributeService.class))
             .quit(new PlayerQuitEvent(alice,"quit"));drain();
-        assertNull(database.use(r->r.get("proposals",b.id().toString())));assertNull(directory.live(a.liveId()));
+        assertEquals(proposal,database.use(r->r.get("proposals",b.id().toString())));assertNull(directory.live(a.liveId()));
     }
     @Test void quitUsesCurrentIdentityInsteadOfOlderPersistedProfile(){
         seed();UUID olderId=UUID.randomUUID();
@@ -222,21 +260,21 @@ class NormalMarriageFlowTest {
         marriages.submit(null,r->null,x->{});drain();
         new PlayerLifecycleListener(directory,mock(WeddingService.class),marriages,mock(BondAttributeService.class))
             .quit(new PlayerQuitEvent(alice,"quit"));drain();
-        assertNull(database.use(r->r.get("proposals",b.id().toString())));
+        assertEquals(proposal,database.use(r->r.get("proposals",b.id().toString())));
         assertNotNull(database.use(r->r.get("profiles",olderId.toString())));
     }
     @Test void quitStillFindsOfflineIdentityWhenGameplaySnapshotHasExpired(){
         seed();var staleDirectory=spy(directory);doReturn(null).when(staleDirectory).live(a.liveId());
         new PlayerLifecycleListener(staleDirectory,mock(WeddingService.class),marriages,mock(BondAttributeService.class))
             .quit(new PlayerQuitEvent(alice,"quit"));drain();
-        assertNull(database.use(r->r.get("proposals",b.id().toString())));
+        assertEquals(proposal,database.use(r->r.get("proposals",b.id().toString())));
         assertNull(directory.session(a.liveId()));
     }
     @Test void queuedAcceptanceCannotUseProposersNewLogin(){
         seed();marriages.accept(b);directory.leave(a.liveId());directory.join(alice);
         marriages.leave(a.liveId(),a.id());drain();
         assertTrue(database.<Boolean>use(r->r.findAll().isEmpty()));
-        assertNull(database.use(r->r.get("proposals",b.id().toString())));
+        assertEquals(proposal,database.use(r->r.get("proposals",b.id().toString())));
     }
     @ParameterizedTest @ValueSource(strings={"propose","accept","deny"})
     void reloadQueuedFirstCannotApplyOldRequestToNewDatabase(String op) throws Exception {

@@ -97,4 +97,25 @@ class ConfigurationDefaultsTest {
         assertTrue(ConfigurationDefaults.merge(actual,new YamlConfiguration(),"gui/main_menu.yml"));
         assertEquals("#########",actual.getStringList("layout").getLast());
     }
+
+    @Test void upgradesOnlyTheUncustomizedSpecificMonsterTask() {
+        var actual = new YamlConfiguration();
+        actual.set("tasks", java.util.List.of(java.util.Map.of(
+                "id", "kill-specific", "type", "COMMON_KILL_SPECIFIC",
+                "name", "共同击杀指定怪物", "target", 3)));
+        var defaults = new YamlConfiguration();
+        defaults.set("tasks", java.util.List.of(java.util.Map.of(
+                "id", "kill-specific", "type", "COMMON_KILL_SPECIFIC",
+                "value", "RANDOM_COMMON_MONSTER", "name", "共同击杀指定怪物：{monster}", "target", 3)));
+        assertTrue(ConfigurationDefaults.merge(actual, defaults, "tasks.yml"));
+        var upgraded = actual.getMapList("tasks").getFirst();
+        assertEquals("RANDOM_COMMON_MONSTER", upgraded.get("value"));
+        assertEquals("共同击杀指定怪物：{monster}", upgraded.get("name"));
+
+        actual.set("tasks", java.util.List.of(java.util.Map.of(
+                "id", "kill-specific", "type", "COMMON_KILL_SPECIFIC",
+                "name", "自定义击杀任务", "target", 3)));
+        assertFalse(ConfigurationDefaults.merge(actual, defaults, "tasks.yml"));
+        assertFalse(actual.getMapList("tasks").getFirst().containsKey("value"));
+    }
 }
