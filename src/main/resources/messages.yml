@@ -30,7 +30,7 @@
   "request-ambiguous": "<yellow>有多张有效请帖，请使用 /marry menu invitation 选择具体婚礼。</yellow>",
   "proposal-denied": "<gray>已拒绝请求。</gray>",
   "engaged": "<gradient:#FABD94:#EBA1CC>订婚成功，有效期 {hours} 小时；可 /marry cancel 取消。</gradient>",
-  "married": "<gradient:#FFD594:#F495BA>祝福 {player1} 与 {player2} 正式结为伴侣！</gradient>",
+  "married": "<gradient:#FFD594:#F495BA>❤️ 祝福 {player1} 与 {player2} 喜结连理！ ❤️</gradient>",
   "cancelled": "<gray>已取消订婚。</gray>",
   "divorce-requested": "<yellow>离婚将在 {hours} 小时后生效；可 /marry withdraw 撤销。</yellow>",
   "divorce-withdrawn": "<gradient:#9CDCC4:#9FBFED>已撤销离婚申请。</gradient>",

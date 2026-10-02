@@ -36,6 +36,14 @@ class BrandTextTest {
         for (var key : KEYS) assertGradient(y.getString(key));
         assertGradient(read("gui/main_menu.yml").getString("title"));
     }
+    @Test void marriageAnnouncementUsesHeartAndAuspiciousWording() throws Exception {
+        var announcement = read("messages.yml").getString("married");
+        assertNotNull(announcement);
+        assertTrue(announcement.contains("❤️"));
+        assertTrue(announcement.contains("喜结连理"));
+        assertTrue(announcement.contains("{player1}") && announcement.contains("{player2}"));
+        assertTrue(announcement.contains("<gradient:") && announcement.contains("</gradient>"));
+    }
     @Test void previousDefaultMessagesUpgradeAndPersistIdempotently() throws Exception {
         var defaults = read("messages.yml"); var target = new YamlConfiguration();
         target.loadFromString(defaults.saveToString());
